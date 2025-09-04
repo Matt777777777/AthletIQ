@@ -1,25 +1,53 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { saveProfile } from "../lib/profile";
 
 const goals = ["Perdre du poids", "Prendre du muscle", "Être en forme"];
 const diets = ["Végétarien", "Vegan", "Sans gluten", "Aucune restriction"];
 
 export default function Onboarding() {
   const router = useRouter();
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [goal, setGoal] = useState<string | null>(null);
   const [sessions, setSessions] = useState<number>(4);
   const [diet, setDiet] = useState<string | null>(null);
+  const [firstName, setFirstName] = useState<string>("");
+  const [age, setAge] = useState<string>("");
+  const [weight, setWeight] = useState<string>("");
+  const [height, setHeight] = useState<string>("");
 
-  function next() {
-    if (step < 3) setStep((s) => (s + 1) as 1 | 2 | 3);
-    else {
-      router.replace({
-        pathname: "/dashboard",
-        params: { goal: goal ?? "", sessions: String(sessions), diet: diet ?? "" },
-      });
+  async function next() {
+    if (step < 4) {
+      setStep((s) => (s + 1) as 1 | 2 | 3 | 4);
+      return;
     }
+
+    // Étape finale : on enregistre le profil en local
+    const profile = {
+      goal: goal ?? "Être en forme",
+      sessions,
+      diet: diet ?? "Aucune restriction",
+      firstName: firstName.trim() || undefined,
+      age: age ? parseInt(age) : undefined,
+      weight: weight ? parseFloat(weight) : undefined,
+      height: height ? parseFloat(height) : undefined,
+    };
+    try {
+      await saveProfile(profile);
+    } catch (e) {
+      console.warn("saveProfile error", e);
+    }
+
+    // Puis on va aux onglets (on passe aussi les params pour compat)
+    router.replace({
+      pathname: "/(tabs)",
+      params: {
+        goal: profile.goal,
+        sessions: String(profile.sessions),
+        diet: profile.diet,
+      },
+    });
   }
 
   return (
@@ -105,6 +133,108 @@ export default function Onboarding() {
         </View>
       )}
 
+      {step === 4 && (
+        <View style={{ gap: 20 }}>
+          <Text style={{ color: "#fff", fontSize: 20, fontWeight: "700", marginBottom: 8 }}>
+            Quelques infos sur toi
+          </Text>
+          
+          <View style={{ gap: 16 }}>
+            <View>
+              <Text style={{ color: "#aaa", fontSize: 16, marginBottom: 8 }}>
+                Ton prénom
+              </Text>
+              <TextInput
+                value={firstName}
+                onChangeText={setFirstName}
+                placeholder="Ex: Marie"
+                placeholderTextColor="#666"
+                style={{
+                  backgroundColor: "#111",
+                  borderWidth: 1,
+                  borderColor: "#222",
+                  padding: 16,
+                  borderRadius: 12,
+                  color: "#fff",
+                  fontSize: 16,
+                }}
+              />
+            </View>
+
+            <View>
+              <Text style={{ color: "#aaa", fontSize: 16, marginBottom: 8 }}>
+                Ton âge
+              </Text>
+              <TextInput
+                value={age}
+                onChangeText={setAge}
+                placeholder="Ex: 25"
+                placeholderTextColor="#666"
+                keyboardType="numeric"
+                style={{
+                  backgroundColor: "#111",
+                  borderWidth: 1,
+                  borderColor: "#222",
+                  padding: 16,
+                  borderRadius: 12,
+                  color: "#fff",
+                  fontSize: 16,
+                }}
+              />
+            </View>
+
+            <View>
+              <Text style={{ color: "#aaa", fontSize: 16, marginBottom: 8 }}>
+                Ton poids (kg)
+              </Text>
+              <TextInput
+                value={weight}
+                onChangeText={setWeight}
+                placeholder="Ex: 70"
+                placeholderTextColor="#666"
+                keyboardType="numeric"
+                style={{
+                  backgroundColor: "#111",
+                  borderWidth: 1,
+                  borderColor: "#222",
+                  padding: 16,
+                  borderRadius: 12,
+                  color: "#fff",
+                  fontSize: 16,
+                }}
+              />
+            </View>
+
+            <View>
+              <Text style={{ color: "#aaa", fontSize: 16, marginBottom: 8 }}>
+                Ta taille (cm)
+              </Text>
+              <TextInput
+                value={height}
+                onChangeText={setHeight}
+                placeholder="Ex: 175"
+                placeholderTextColor="#666"
+                keyboardType="numeric"
+                style={{
+                  backgroundColor: "#111",
+                  borderWidth: 1,
+                  borderColor: "#222",
+                  padding: 16,
+                  borderRadius: 12,
+                  color: "#fff",
+                  fontSize: 16,
+                }}
+              />
+            </View>
+          </View>
+
+          <Text style={{ color: "#666", fontSize: 14, textAlign: "center", marginTop: 8 }}>
+            Ces informations nous aideront à personnaliser tes recommandations. 
+            Tu pourras les modifier plus tard dans ton profil.
+          </Text>
+        </View>
+      )}
+
       <View style={{ marginTop: "auto", paddingVertical: 24 }}>
         <Pressable
           onPress={next}
@@ -118,13 +248,13 @@ export default function Onboarding() {
           }}
         >
           <Text style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>
-            {step < 3 ? "Continuer" : "Terminer"}
+            {step < 4 ? "Continuer" : "Terminer"}
           </Text>
         </Pressable>
 
         {step > 1 && (
           <Pressable
-            onPress={() => setStep((s) => (s - 1) as 1 | 2 | 3)}
+            onPress={() => setStep((s) => (s - 1) as 1 | 2 | 3 | 4)}
             style={{ paddingVertical: 14, alignItems: "center" }}
           >
             <Text style={{ color: "#aaa" }}>Retour</Text>
@@ -134,3 +264,4 @@ export default function Onboarding() {
     </View>
   );
 }
+

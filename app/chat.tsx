@@ -1,55 +1,646 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from "react-native";
+import { estimateKcalTarget } from "../lib/nutrition";
+import { loadProfile, saveDailyMeal, savePlan, saveProfile, UserProfile } from "../lib/profile";
+import { addShoppingItem, extractIngredientsFromAIResponse } from "../lib/shopping";
+
+// ✅ Endpoint Vercel (prod)
+const endpoint =
+  "https://the-sport-backend-o6wzopx00-matts-projects-43da855b.vercel.app/api/chat";
 
 type Message = {
   id: string;
   text: string;
   sender: "user" | "ai";
+  originalText?: string; // Texte original avec balises JSON
 };
 
 export default function Chat() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "welcome",
-      text: "Salut 👋 Je suis ton coach IA. Pose-moi une question (ex: “Fais-moi une séance de 45 min sans matériel” ou “Plan repas 2000 kcal sans gluten”).",
-      sender: "ai",
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isAskingProfileQuestions, setIsAskingProfileQuestions] = useState(false);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [lastAIResponse, setLastAIResponse] = useState<Message | null>(null);
+  const [showSaveButtons, setShowSaveButtons] = useState(false);
   const listRef = useRef<FlatList>(null);
 
-  const sendMessage = async () => {
+  // Fonction pour nettoyer le texte des réponses IA
+  const cleanText = (text: string): string => {
+    return text
+      // Supprimer les balises markdown
+      .replace(/#{1,6}\s*/g, '') // Enlever les # (titres)
+      .replace(/\*\*(.*?)\*\*/g, '$1') // Enlever les ** (gras)
+      .replace(/\*(.*?)\*/g, '$1') // Enlever les * (italique)
+      .replace(/`(.*?)`/g, '$1') // Enlever les ` (code)
+      .replace(/~~(.*?)~~/g, '$1') // Enlever les ~~ (barré)
+      // Masquer la section "Ingrédients :" pour l'affichage
+      .replace(/Ingrédients\s*:[\s\S]*?(?=Préparation\s*:|$)/g, '')
+      // Nettoyer les listes et puces
+      .replace(/^[\s]*[-*+]\s+/gm, '• ') // Remplacer les puces par •
+      .replace(/^[\s]*\d+\.\s+/gm, '') // Enlever les numérotations
+      // Nettoyer les espaces multiples
+      .replace(/\n\s*\n\s*\n/g, '\n\n') // Réduire les sauts de ligne multiples
+      .replace(/[ \t]+/g, ' ') // Réduire les espaces multiples
+      .trim();
+  };
+
+  // Fonction pour extraire le titre du plat depuis la réponse IA
+  const extractMealTitle = (content: string): string => {
+    // Diviser le contenu en lignes et filtrer les lignes vides
+    const lines = content.split('\n').filter(line => line.trim().length > 0);
+    
+    // Si on a au moins 1 ligne, prendre la première ligne comme titre (nom du plat)
+    if (lines.length >= 1) {
+      const firstLine = lines[0].trim();
+      // Nettoyer la ligne (enlever les deux-points, etc.)
+      let cleanedTitle = firstLine.replace(/[:•\-\*]/g, '').trim();
+      
+      // Supprimer les préfixes de repas
+      cleanedTitle = cleanedTitle.replace(/^(PetitDéjeuner|Petit-déjeuner|Déjeuner|Dîner|Collation|Snack)\s*:?\s*/i, '');
+      
+      return cleanedTitle;
+    }
+
+    // Fallback: retourner un titre générique
+    return "Recette générée";
+  };
+
+  // Fonction pour nettoyer le contenu de la recette
+  const cleanMealContent = (content: string): string => {
+    // Diviser le contenu en lignes et filtrer les lignes vides
+    const lines = content.split('\n').filter(line => line.trim().length > 0);
+    
+    // Si on a au moins 2 lignes, supprimer seulement la première ligne (titre)
+    if (lines.length >= 2) {
+      // Prendre toutes les lignes sauf la première (qui est le titre)
+      const contentLines = lines.slice(1);
+      return contentLines.join('\n').trim();
+    }
+    
+    // Si on a seulement une ligne, essayer de nettoyer avec les patterns
+    if (lines.length === 1) {
+      const introPatterns = [
+        /Voici une idée de [^:]+ pour [^:]+:/gi,
+        /Voici une idée de [^:]+:/gi,
+        /Voici [^:]+ pour [^:]+:/gi,
+        /Voici [^:]+:/gi,
+        /Je te propose [^:]+:/gi,
+        /Voici [^:]+ équilibré:/gi,
+      ];
+
+      let cleanedContent = content;
+      
+      for (const pattern of introPatterns) {
+        cleanedContent = cleanedContent.replace(pattern, '').trim();
+      }
+
+      // Nettoyer les espaces et sauts de ligne en début
+      cleanedContent = cleanedContent.replace(/^\s*\n+/, '').trim();
+      
+      return cleanedContent;
+    }
+    
+    return content;
+  };
+
+  // Fonction pour détecter si la réponse contient plusieurs repas du jour
+  const detectMultipleMeals = (content: string): boolean => {
+    const contentLower = content.toLowerCase();
+    const mealKeywords = ['petit-déjeuner', 'déjeuner', 'collation', 'dîner', 'breakfast', 'lunch', 'snack', 'dinner'];
+    const foundMeals = mealKeywords.filter(keyword => contentLower.includes(keyword));
+    return foundMeals.length >= 3; // Si on trouve au moins 3 types de repas
+  };
+
+  // Fonction pour extraire les repas individuels d'une réponse multi-repas
+  const extractIndividualMeals = (content: string): Array<{type: string, title: string, content: string}> => {
+    const meals: Array<{type: string, title: string, content: string}> = [];
+    
+    // Diviser le contenu par sections de repas
+    const sections = content.split(/(?=PETIT-DÉJEUNER|DÉJEUNER|COLLATION|DÎNER|BREAKFAST|LUNCH|SNACK|DINNER)/i);
+    
+    sections.forEach(section => {
+      const trimmedSection = section.trim();
+      if (!trimmedSection) return;
+      
+      // Déterminer le type de repas
+      let mealType = '';
+      if (trimmedSection.toLowerCase().includes('petit-déjeuner') || trimmedSection.toLowerCase().includes('breakfast')) {
+        mealType = 'breakfast';
+      } else if (trimmedSection.toLowerCase().includes('déjeuner') || trimmedSection.toLowerCase().includes('lunch')) {
+        mealType = 'lunch';
+      } else if (trimmedSection.toLowerCase().includes('collation') || trimmedSection.toLowerCase().includes('snack')) {
+        mealType = 'snack';
+      } else if (trimmedSection.toLowerCase().includes('dîner') || trimmedSection.toLowerCase().includes('dinner')) {
+        mealType = 'dinner';
+      }
+      
+      if (mealType) {
+        const lines = trimmedSection.split('\n').filter(line => line.trim().length > 0);
+        
+        // Chercher le nom du plat (première ligne qui n'est pas un titre de section)
+        let title = `${mealType} généré`;
+        let contentStartIndex = 1;
+        
+        // Ignorer les lignes de titre de section (PETIT-DÉJEUNER, etc.)
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (line && !line.match(/^(PETIT-DÉJEUNER|DÉJEUNER|COLLATION|DÎNER|BREAKFAST|LUNCH|SNACK|DINNER)/i)) {
+            title = line;
+            contentStartIndex = i + 1;
+            break;
+          }
+        }
+        
+        const mealContent = lines.slice(contentStartIndex).join('\n').trim();
+        
+        meals.push({
+          type: mealType,
+          title: title,
+          content: mealContent
+        });
+      }
+    });
+    
+    return meals;
+  };
+
+  // Questions complémentaires pour le profil
+  const profileQuestions = [
+    "Quel est ton niveau de sport actuel ? (débutant, intermédiaire, avancé)",
+    "Quel matériel de sport as-tu à disposition ? (aucun, basique, complet)",
+    "As-tu des intolérances alimentaires ou des allergies ?",
+    "Y a-t-il des exercices que tu ne peux pas faire ? (problèmes de dos, genoux, etc.)",
+    "À quel moment préfères-tu faire du sport ? (matin, midi, soir, flexible)"
+  ];
+
+  // Fonction pour détecter et extraire les informations du profil depuis une réponse
+  const extractProfileInfo = (text: string): Partial<UserProfile> => {
+    const lowerText = text.toLowerCase();
+    const updates: Partial<UserProfile> = {};
+
+    // Détection du niveau de sport
+    if (lowerText.includes('débutant') || lowerText.includes('debutant')) {
+      updates.fitnessLevel = "Débutant";
+    } else if (lowerText.includes('intermédiaire') || lowerText.includes('intermediaire')) {
+      updates.fitnessLevel = "Intermédiaire";
+    } else if (lowerText.includes('avancé') || lowerText.includes('avance')) {
+      updates.fitnessLevel = "Avancé";
+    }
+
+    // Détection du matériel
+    if (lowerText.includes('aucun') || lowerText.includes('rien') || lowerText.includes('pas de matériel')) {
+      updates.equipment = "Aucun";
+    } else if (lowerText.includes('basique') || lowerText.includes('tapis') || lowerText.includes('élastique')) {
+      updates.equipment = "Basique";
+    } else if (lowerText.includes('complet') || lowerText.includes('salle') || lowerText.includes('haltères')) {
+      updates.equipment = "Complet";
+    }
+
+    // Détection des intolérances
+    if (lowerText.includes('aucune') || lowerText.includes('pas d\'intolérance') || lowerText.includes('rien')) {
+      updates.intolerances = "Aucune";
+      } else {
+      const intolerances = [];
+      if (lowerText.includes('lactose')) intolerances.push('Lactose');
+      if (lowerText.includes('gluten')) intolerances.push('Gluten');
+      if (lowerText.includes('fruits à coque') || lowerText.includes('noix')) intolerances.push('Fruits à coque');
+      if (intolerances.length > 0) {
+        updates.intolerances = intolerances.join(', ');
+      }
+    }
+
+    // Détection des limitations
+    if (lowerText.includes('aucune') || lowerText.includes('pas de problème') || lowerText.includes('rien')) {
+      updates.limitations = "Aucune";
+    } else {
+      const limitations = [];
+      if (lowerText.includes('dos') || lowerText.includes('lombaires')) limitations.push('Problèmes de dos');
+      if (lowerText.includes('genoux') || lowerText.includes('genou')) limitations.push('Problèmes de genoux');
+      if (limitations.length > 0) {
+        updates.limitations = limitations.join(', ');
+      }
+    }
+
+    // Détection des horaires préférés
+    if (lowerText.includes('matin')) {
+      updates.preferredTime = "Matin";
+    } else if (lowerText.includes('midi')) {
+      updates.preferredTime = "Midi";
+    } else if (lowerText.includes('soir')) {
+      updates.preferredTime = "Soir";
+    } else if (lowerText.includes('flexible') || lowerText.includes('n\'importe')) {
+      updates.preferredTime = "Flexible";
+    }
+
+    return updates;
+  };
+
+  useEffect(() => {
+    const initializeChat = async () => {
+      try {
+        const loadedProfile = await loadProfile();
+        setProfile(loadedProfile);
+        
+        // Initialiser les messages selon le profil
+        if (loadedProfile) {
+          // Vérifier si on doit poser les questions (première fois seulement)
+          const shouldAskQuestions = !loadedProfile.chatQuestionsAsked;
+          
+          console.log("Profil chargé:", loadedProfile);
+          console.log("Questions déjà posées:", loadedProfile.chatQuestionsAsked);
+          console.log("Doit poser les questions:", shouldAskQuestions);
+          
+          if (shouldAskQuestions) {
+            setMessages([
+              {
+                id: "welcome",
+                text: "Salut ! Je suis ton coach IA. Pour créer un programme parfaitement adapté à tes besoins, j'aimerais te poser quelques questions :",
+                sender: "ai",
+              },
+              {
+                id: "question_0",
+                text: `1/5 - ${profileQuestions[0]}`,
+                sender: "ai",
+              }
+            ]);
+            setIsAskingProfileQuestions(true);
+            setCurrentQuestionIndex(0);
+          } else {
+            // Profil complet, message d'accueil personnalisé
+            const welcomeMessage = loadedProfile.firstName 
+              ? `Salut ${loadedProfile.firstName} ! Je suis ton coach IA. Je connais ton profil et je vais adapter toutes mes réponses à tes besoins. Pose-moi une question !`
+              : "Salut ! Je suis ton coach IA. Je connais ton profil et je vais adapter toutes mes réponses à tes besoins. Pose-moi une question !";
+            
+            setMessages([
+              {
+                id: "welcome",
+                text: welcomeMessage,
+                sender: "ai",
+              },
+            ]);
+          }
+        } else {
+          // Pas de profil, message d'accueil générique
+          setMessages([
+            {
+              id: "welcome",
+              text: "Salut ! Je suis ton coach IA. Commence par faire ton onboarding pour des conseils personnalisés !",
+              sender: "ai",
+            },
+          ]);
+        }
+      } catch (error) {
+        console.error("Erreur lors de l'initialisation du chat:", error);
+        setMessages([
+          {
+            id: "error",
+            text: "Erreur lors du chargement de ton profil. Réessaie plus tard !",
+            sender: "ai",
+          },
+        ]);
+      }
+    };
+
+    initializeChat();
+  }, []);
+
+  // Fonction pour traiter une réponse et mettre à jour le profil
+  const handleProfileAnswer = async (answer: string) => {
+    if (!profile) return;
+
+    console.log("Traitement de la réponse:", answer);
+    
+    // Ajouter la réponse de l'utilisateur aux messages
+    const userMessage: Message = {
+      id: `answer_${currentQuestionIndex}`,
+      text: answer,
+      sender: "user",
+    };
+    setMessages(prev => [...prev, userMessage]);
+    
+    // Extraire les informations du profil depuis la réponse
+    const profileUpdates = extractProfileInfo(answer);
+    
+    // Enregistrer la réponse exacte selon la question actuelle
+    const questionKeys = ['fitnessLevel', 'equipment', 'intolerances', 'limitations', 'preferredTime'];
+    const currentQuestionKey = questionKeys[currentQuestionIndex];
+    
+    // Créer ou mettre à jour les réponses exactes
+    const currentChatResponses = profile.chatResponses || {};
+    const updatedChatResponses = {
+      ...currentChatResponses,
+      [currentQuestionKey]: answer
+    };
+    
+    console.log("Informations extraites:", profileUpdates);
+    console.log("Réponse exacte enregistrée:", { [currentQuestionKey]: answer });
+    
+    try {
+      const updatedProfile = { 
+        ...profile, 
+        ...profileUpdates,
+        chatResponses: updatedChatResponses
+      };
+      await saveProfile(updatedProfile);
+      setProfile(updatedProfile);
+      
+      console.log("Profil mis à jour:", updatedProfile);
+      
+    } catch (error) {
+      console.error("Erreur lors de la sauvegarde du profil:", error);
+    }
+    
+    // Passer à la question suivante (même si la sauvegarde a échoué)
+    const nextIndex = currentQuestionIndex + 1;
+    setCurrentQuestionIndex(nextIndex);
+    
+    // Poser la question suivante ou terminer
+    setTimeout(async () => {
+      if (nextIndex < profileQuestions.length) {
+        const nextQuestion: Message = {
+          id: `question_${nextIndex}`,
+          text: `${nextIndex + 1}/5 - ${profileQuestions[nextIndex]}`,
+          sender: "ai",
+        };
+        setMessages(prev => [...prev, nextQuestion]);
+      } else {
+        // Toutes les questions posées - marquer comme terminé
+        setIsAskingProfileQuestions(false);
+        
+        // Marquer que les questions ont été posées
+        try {
+          const finalProfile = { ...profile, chatQuestionsAsked: true };
+          await saveProfile(finalProfile);
+          setProfile(finalProfile);
+          console.log("Questions marquées comme posées");
+        } catch (error) {
+          console.error("Erreur lors de la sauvegarde du flag:", error);
+        }
+        
+        const completionMessage: Message = {
+          id: "completion",
+          text: "Parfait ! J'ai toutes les informations nécessaires. Maintenant je peux te donner des conseils parfaitement adaptés à ton profil. Que veux-tu faire ?",
+          sender: "ai",
+        };
+        setMessages(prev => [...prev, completionMessage]);
+      }
+    }, 500);
+  };
+
+    const sendMessage = async () => {
     const content = input.trim();
-    if (!content) return;
+    if (!content || loading) return;
+
+    // Si on est en train de poser les questions de profil, traiter la réponse
+    if (isAskingProfileQuestions) {
+      await handleProfileAnswer(content);
+      setInput("");
+      return; // Ne pas continuer avec le message normal
+    }
 
     const userMsg: Message = { id: Date.now().toString(), text: content, sender: "user" };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
+    setLoading(true);
+    setShowSaveButtons(false); // Masquer les boutons lors d'un nouveau message
 
-    // --- SIMULATION de réponse IA (pour valider l’UI)
-    const thinking: Message = {
-      id: (Date.now() + 1).toString(),
-      text: "Je réfléchis à la meilleure proposition pour toi… 🧠",
-      sender: "ai",
-    };
-    setMessages((prev) => [...prev, thinking]);
+    try {
+      // Construire le prompt système avec toutes les informations du profil
+      let systemPrompt = "Tu es un coach sportif & nutrition pour l'app AthletIQ. " +
+        "Réponds en français, de façon claire et structurée (listes, étapes). " +
+        "N'effectue pas de conseils médicaux ; oriente vers un professionnel si nécessaire.";
 
-    // petite pause pour l’effet
-    setTimeout(() => {
-      setMessages((prev) =>
-        prev
-          .filter((m) => m.id !== thinking.id)
-          .concat({
-            id: (Date.now() + 2).toString(),
-            text:
-              content.toLowerCase().includes("séance") || content.toLowerCase().includes("workout")
-                ? "Voici un exemple de séance 45 min (sans matériel):\n• Échauffement 5’ (montées de genoux, rotations)\n• Circuit x4 : 12 pompes • 20 squats • 15 fentes (chaque jambe) • 30” gainage\n• Finisher 6’ : 30” burpees / 30” repos\n• Etirements 4’"
-                : "Exemple de plan repas ~2000 kcal :\n• Petit-déj: bowl protéiné (flocons, skyr, fruits rouges)\n• Déj: poulet, quinoa, légumes rôtis (550 kcal)\n• Dîner: cabillaud, riz basmati, brocoli (500 kcal)\n• Snacks: pomme + amandes, yaourt grec",
-            sender: "ai",
-          })
-      );
-      listRef.current?.scrollToEnd({ animated: true });
-    }, 900);
+      if (profile) {
+        // Calculer les besoins caloriques
+        const kcalTarget = estimateKcalTarget(profile);
+        const breakfastKcal = Math.round(kcalTarget * 0.25); // 25% du total
+        const lunchKcal = Math.round(kcalTarget * 0.35); // 35% du total
+        const snackKcal = Math.round(kcalTarget * 0.15); // 15% du total
+        const dinnerKcal = Math.round(kcalTarget * 0.25); // 25% du total
+
+        systemPrompt += "\n\nINFORMATIONS UTILISATEUR (à utiliser pour personnaliser tes réponses) :";
+        
+        // Informations personnelles
+        if (profile.firstName) {
+          systemPrompt += `\n- Prénom: ${profile.firstName}`;
+        }
+        if (profile.age) {
+          systemPrompt += `\n- Âge: ${profile.age} ans`;
+        }
+        if (profile.weight) {
+          systemPrompt += `\n- Poids: ${profile.weight} kg`;
+        }
+        if (profile.height) {
+          systemPrompt += `\n- Taille: ${profile.height} cm`;
+        }
+        
+        // Objectifs et préférences
+        systemPrompt += `\n- Objectif: ${profile.goal}`;
+        systemPrompt += `\n- Séances par semaine: ${profile.sessions}`;
+        systemPrompt += `\n- Régime alimentaire: ${profile.diet}`;
+        
+        // BESOINS CALORIQUES (nouveau)
+        systemPrompt += `\n\nBESOINS CALORIQUES QUOTIDIENS:`;
+        systemPrompt += `\n- Total quotidien: ${kcalTarget} kcal`;
+        systemPrompt += `\n- Petit-déjeuner: ${breakfastKcal} kcal (25%)`;
+        systemPrompt += `\n- Déjeuner: ${lunchKcal} kcal (35%)`;
+        systemPrompt += `\n- Collation: ${snackKcal} kcal (15%)`;
+        systemPrompt += `\n- Dîner: ${dinnerKcal} kcal (25%)`;
+        
+        // Informations complémentaires (valeurs extraites)
+        if (profile.fitnessLevel) {
+          systemPrompt += `\n- Niveau de sport: ${profile.fitnessLevel}`;
+        }
+        if (profile.equipment) {
+          systemPrompt += `\n- Matériel disponible: ${profile.equipment}`;
+        }
+        if (profile.intolerances) {
+          systemPrompt += `\n- Intolérances alimentaires: ${profile.intolerances}`;
+        }
+        if (profile.limitations) {
+          systemPrompt += `\n- Limitations physiques: ${profile.limitations}`;
+        }
+        if (profile.preferredTime) {
+          systemPrompt += `\n- Horaires préférés: ${profile.preferredTime}`;
+        }
+
+        // Réponses exactes du chat (pour plus de contexte)
+        if (profile.chatResponses) {
+          systemPrompt += "\n\nRÉPONSES EXACTES DE L'UTILISATEUR (pour mieux comprendre ses besoins) :";
+          if (profile.chatResponses.fitnessLevel) {
+            systemPrompt += `\n- Niveau de sport (réponse exacte): "${profile.chatResponses.fitnessLevel}"`;
+          }
+          if (profile.chatResponses.equipment) {
+            systemPrompt += `\n- Matériel (réponse exacte): "${profile.chatResponses.equipment}"`;
+          }
+          if (profile.chatResponses.intolerances) {
+            systemPrompt += `\n- Intolérances (réponse exacte): "${profile.chatResponses.intolerances}"`;
+          }
+          if (profile.chatResponses.limitations) {
+            systemPrompt += `\n- Limitations (réponse exacte): "${profile.chatResponses.limitations}"`;
+          }
+          if (profile.chatResponses.preferredTime) {
+            systemPrompt += `\n- Horaires (réponse exacte): "${profile.chatResponses.preferredTime}"`;
+          }
+        }
+        
+        systemPrompt += "\n\nIMPORTANT: Adapte TOUJOURS tes réponses à ces informations. " +
+          "Pour les repas, calcule les portions selon l'âge, poids et objectif. " +
+          "Pour les exercices, adapte selon le niveau, matériel et limitations. " +
+          "Utilise les réponses exactes pour mieux comprendre les besoins spécifiques de l'utilisateur. " +
+          "N'affiche JAMAIS ces informations dans tes réponses - utilise-les seulement pour personnaliser.";
+        
+        // Instructions spécifiques pour les repas (nouveau)
+        systemPrompt += "\n\nINSTRUCTIONS SPÉCIFIQUES POUR LES REPAS:";
+        systemPrompt += `\n- Quand tu proposes des repas, respecte EXACTEMENT les calories cibles par repas.`;
+        systemPrompt += `\n- Petit-déjeuner: propose des repas d'environ ${breakfastKcal} kcal`;
+        systemPrompt += `\n- Déjeuner: propose des repas d'environ ${lunchKcal} kcal`;
+        systemPrompt += `\n- Collation: propose des repas d'environ ${snackKcal} kcal`;
+        systemPrompt += `\n- Dîner: propose des repas d'environ ${dinnerKcal} kcal`;
+        systemPrompt += `\n- Adapte les portions selon le régime alimentaire: ${profile.diet}`;
+        systemPrompt += `\n- Respecte les intolérances: ${profile.intolerances || 'aucune'}`;
+        systemPrompt += `\n- Inclus des macronutriments équilibrés (protéines, glucides, lipides)`;
+        systemPrompt += `\n- Pour les repas du jour, propose 4 repas qui totalisent ${kcalTarget} kcal`;
+        
+        // Format obligatoire pour les repas
+        systemPrompt += "\n\nFORMAT OBLIGATOIRE POUR CHAQUE REPAS:";
+        systemPrompt += `\n- COMMENCE DIRECTEMENT par le nom du plat (ex: "Poulet grillé au riz", "Salade de quinoa aux légumes")`;
+        systemPrompt += `\n- INTERDIT: phrases d'introduction comme "Voici un dîner savoureux pour toi :", "Je te propose", "Voici une idée"`;
+        systemPrompt += `\n- Le nom doit être descriptif et appétissant`;
+        systemPrompt += `\n- Ensuite, liste les ingrédients avec "Ingrédients :"`;
+        systemPrompt += `\n- Puis liste la préparation avec "Préparation :"`;
+        systemPrompt += `\n- Structure: NOM DU PLAT (1ère ligne) → Ingrédients : → Préparation :`;
+        
+        // Instructions pour la détection du type de demande
+        systemPrompt += "\n\nDÉTECTION DU TYPE DE DEMANDE:";
+        systemPrompt += `\n- Si l'utilisateur demande UN SEUL repas (ex: "petit-déjeuner", "déjeuner", "collation", "dîner"):`;
+        systemPrompt += `\n  * Propose UNIQUEMENT ce repas avec les calories appropriées`;
+        systemPrompt += `\n  * Utilise le format standard d'un repas unique`;
+        systemPrompt += `\n  * COMMENCE par le nom du plat (ex: "Poulet grillé au riz")`;
+        systemPrompt += `\n- Si l'utilisateur demande TOUS les repas du jour (ex: "repas du jour", "planification", "menu complet"):`;
+        systemPrompt += `\n  * Propose les 4 repas dans un format unifié`;
+        systemPrompt += `\n  * Structure: "PETIT-DÉJEUNER", "DÉJEUNER", "COLLATION", "DÎNER"`;
+        systemPrompt += `\n  * Chaque repas COMMENCE par son nom de plat`;
+        systemPrompt += `\n  * Puis liste les ingrédients et la préparation`;
+        systemPrompt += `\n  * Total des 4 repas = ${kcalTarget} kcal`;
+      }
+
+              systemPrompt += "\n\nFORMAT RECETTES - Utilise TOUJOURS :" +
+        "\n<INGREDIENTS>" +
+        "\n{\"ingredients\": [{\"name\": \"nom\", \"quantity\": \"qty\", \"unit\": \"unité\", \"category\": \"catégorie\"}]}" +
+        "\n</INGREDIENTS>" +
+        "\n" +
+        "Catégories: Fruits, Légumes, Protéines, Céréales, Épicerie, Laitages, Autres" +
+        "\nUnités: g, kg, ml, l, cuillères, tasses, pincées, branches, gousses, tranches, unités" +
+        "\n" +
+        "IMPORTANT: Réponses concises et directes. Évite les répétitions et les détails superflus." +
+        "\n" +
+        "FORMAT AFFICHAGE REPAS:" +
+        "\n- NOM DU PLAT (1ère ligne) - SANS phrase d'introduction" +
+        "\n- Ingrédients : (section masquée pour l'utilisateur mais présente pour extraction)" +
+        "\n- Préparation : (avec les étapes)" +
+        "\n- Les ingrédients sont cachés dans l'affichage mais disponibles pour la liste de course" +
+        "\n" +
+        "INTERDICTIONS STRICTES:" +
+        "\n- JAMAIS de phrases comme 'Voici un dîner savoureux pour toi :'" +
+        "\n- JAMAIS de phrases comme 'Je te propose', 'Voici une idée', 'Voici un repas'" +
+        "\n- COMMENCE DIRECTEMENT par le nom du plat";
+
+      const r = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            { role: "system", content: systemPrompt },
+            ...messages.map((m) => ({
+              role: m.sender === "user" ? "user" : "assistant",
+              content: m.text,
+            })),
+            { role: "user", content },
+          ],
+        }),
+      });
+
+      const ct = r.headers.get("content-type") || "";
+      const text = await r.text();
+      if (!r.ok) throw new Error(`HTTP ${r.status} - ${text.slice(0, 220)}`);
+      if (!ct.includes("application/json"))
+        throw new Error(`Réponse non-JSON: ${text.slice(0, 220)}`);
+
+      const data = JSON.parse(text);
+      const replyText = data.reply?.toString() || "Pas de réponse reçue.";
+
+      // Nettoyer la réponse (supprimer les balises JSON et markdown)
+      const cleanedText = cleanText(replyText.replace(/<INGREDIENTS>[\s\S]*?<\/INGREDIENTS>/gi, '').trim());
+
+      // Streaming artificiel
+      const messageId = (Date.now() + 1).toString();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: messageId,
+          text: "",
+          sender: "ai",
+          originalText: replyText, // Stocker le texte original avec balises JSON
+        },
+      ]);
+
+      setIsTyping(true);
+
+      // Effet de frappe mot par mot
+      let currentText = "";
+      const words = cleanedText.split(" ");
+      
+      for (let i = 0; i < words.length; i++) {
+        currentText += (i > 0 ? " " : "") + words[i];
+        
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === messageId ? { ...msg, text: currentText } : msg
+          )
+        );
+        
+        // Pause variable selon le type de contenu
+        const word = words[i];
+        let delay = 50; // Délai de base
+        
+        if (word.includes("•") || word.includes("-")) delay = 200; // Pause pour les listes
+        else if (word.includes(".") || word.includes("!")) delay = 300; // Pause pour les phrases
+        else if (word.includes(",") || word.includes(":")) delay = 150; // Pause pour les virgules
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+
+      setIsTyping(false);
+      
+      // Capturer la réponse et afficher les boutons de sauvegarde
+      setLastAIResponse({
+        id: messageId,
+        text: cleanedText,
+        sender: "ai",
+        originalText: replyText,
+      });
+      setShowSaveButtons(true);
+    } catch (e: any) {
+      const errorText = "❌ Erreur serveur: " +
+        (e?.message || "inconnue") +
+        "\n(Astuce: vérifie l'URL de l'API et ta clé OpenAI sur Vercel)";
+      
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 2).toString(),
+          text: errorText,
+          sender: "ai",
+        },
+      ]);
+    } finally {
+      setLoading(false);
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
+    }
   };
 
   return (
@@ -59,9 +650,11 @@ export default function Chat() {
       keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
     >
       <View style={{ flex: 1, paddingTop: 60, paddingHorizontal: 12 }}>
-        <Text style={{ color: "#fff", fontSize: 22, fontWeight: "800", marginBottom: 12 }}>
-          💬 Ton coach IA
-        </Text>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <Text style={{ color: "#fff", fontSize: 22, fontWeight: "800" }}>
+            Ton coach IA
+          </Text>
+          </View>
 
         <FlatList
           ref={listRef}
@@ -79,17 +672,310 @@ export default function Chat() {
                 maxWidth: "78%",
               }}
             >
-              <Text style={{ color: "#fff", lineHeight: 20 }}>{item.text}</Text>
+              <Text style={{ color: "#fff", lineHeight: 20 }}>
+                {item.text}
+                {item.sender === "ai" && isTyping && item.text === "" && (
+                  <Text style={{ color: "#666" }}>🤖 écrit...</Text>
+                )}
+              </Text>
             </View>
           )}
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
         />
 
+                {/* Boutons d'action rapide - affichés seulement après une réponse IA */}
+        {showSaveButtons && lastAIResponse && (
+          <View style={{ paddingVertical: 8 }}>
+            {/* Détecter si c'est un repas unique ou multiple */}
+            {detectMultipleMeals(lastAIResponse.text) ? (
+              // Boutons pour repas multiples (repas du jour)
+              <View>
+                <Text style={{ color: "#8a8a8a", fontSize: 12, marginBottom: 8, textAlign: "center" }}>
+                  Enregistrer tous les repas du jour :
+                </Text>
+                <Pressable
+                  onPress={async () => {
+                    try {
+                      const meals = extractIndividualMeals(lastAIResponse?.text || '');
+                      let savedCount = 0;
+                      
+                      for (const meal of meals) {
+                        const success = await saveDailyMeal(meal.type as 'breakfast' | 'lunch' | 'snack' | 'dinner', {
+                          id: `${meal.type}_${Date.now()}_${Math.random()}`,
+                          title: meal.title,
+                          content: meal.content,
+                          date: new Date().toISOString()
+                        });
+                        if (success) savedCount++;
+                      }
+                      
+                      if (savedCount > 0) {
+                        const confirmMessage: Message = {
+                          id: `confirm_${Date.now()}`,
+                          text: `${savedCount} repas enregistrés dans tes repas du jour !`,
+                          sender: "ai",
+                        };
+                        setMessages(prev => [...prev, confirmMessage]);
+                      }
+                    } catch (error) {
+                      console.error('Erreur sauvegarde repas multiples:', error);
+                    }
+                  }}
+                  style={{
+                    backgroundColor: "#1a2a1a",
+                    paddingVertical: 12,
+                    paddingHorizontal: 16,
+                    borderRadius: 8,
+                    alignItems: "center",
+                    borderWidth: 1,
+                    borderColor: "#2a4a2a",
+                    marginBottom: 8,
+                  }}
+                >
+                  <Text style={{ color: "#4CAF50", fontWeight: "600", fontSize: 14 }}>
+                    Enregistrer tous les repas du jour
+                  </Text>
+                </Pressable>
+                
+                <View style={{ flexDirection: "row", gap: 8 }}>
+          <Pressable
+                    onPress={async () => {
+                      const success = await savePlan('workout', 'Séance générée', lastAIResponse?.text || '');
+                      if (success) {
+                        const updatedProfile = await loadProfile();
+                        setProfile(updatedProfile);
+                        const confirmMessage: Message = {
+                          id: `confirm_${Date.now()}`,
+                          text: "Séance enregistrée dans tes plans !",
+                          sender: "ai",
+                        };
+                        setMessages(prev => [...prev, confirmMessage]);
+                      }
+                    }}
+                    style={{
+              flex: 1,
+                      backgroundColor: "#1a2a1a",
+              paddingVertical: 10,
+                      paddingHorizontal: 12,
+                      borderRadius: 8,
+              alignItems: "center",
+                      borderWidth: 1,
+                      borderColor: "#2a4a2a",
+                    }}
+                  >
+                    <Text style={{ color: "#6bff6b", fontWeight: "600", fontSize: 12 }}>
+                      Enregistrer séance
+            </Text>
+          </Pressable>
+
+          <Pressable
+                    onPress={async () => {
+                      const success = await savePlan('meal', 'Repas généré', lastAIResponse?.text || '');
+                      if (success) {
+                        const updatedProfile = await loadProfile();
+                        setProfile(updatedProfile);
+                        const confirmMessage: Message = {
+                          id: `confirm_${Date.now()}`,
+                          text: "Repas enregistré dans tes plans !",
+                          sender: "ai",
+                        };
+                        setMessages(prev => [...prev, confirmMessage]);
+                      }
+                    }}
+                    style={{
+              flex: 1,
+                      backgroundColor: "#1a1a2a",
+              paddingVertical: 10,
+                      paddingHorizontal: 12,
+                      borderRadius: 8,
+              alignItems: "center",
+                      borderWidth: 1,
+                      borderColor: "#2a2a4a",
+                    }}
+                  >
+                    <Text style={{ color: "#6b6bff", fontWeight: "600", fontSize: 12 }}>
+                      Enregistrer repas
+            </Text>
+          </Pressable>
+        </View>
+              </View>
+            ) : (
+              // Boutons pour repas unique
+              <View style={{ flexDirection: "row", gap: 8 }}>
+          <Pressable
+                  onPress={async () => {
+                    const success = await savePlan('workout', 'Séance générée', lastAIResponse?.text || '');
+                    if (success) {
+                      const updatedProfile = await loadProfile();
+                      setProfile(updatedProfile);
+                      const confirmMessage: Message = {
+                        id: `confirm_${Date.now()}`,
+                        text: "Séance enregistrée dans tes plans !",
+                        sender: "ai",
+                      };
+                      setMessages(prev => [...prev, confirmMessage]);
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    backgroundColor: "#1a2a1a",
+                    paddingVertical: 10,
+                    paddingHorizontal: 12,
+                    borderRadius: 8,
+                    alignItems: "center",
+              borderWidth: 1,
+                    borderColor: "#2a4a2a",
+                  }}
+                >
+                  <Text style={{ color: "#6bff6b", fontWeight: "600", fontSize: 12 }}>
+                    Enregistrer séance
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={async () => {
+                    const success = await savePlan('meal', 'Repas généré', lastAIResponse?.text || '');
+                    if (success) {
+                      const updatedProfile = await loadProfile();
+                      setProfile(updatedProfile);
+                      const confirmMessage: Message = {
+                        id: `confirm_${Date.now()}`,
+                        text: "Repas enregistré dans tes plans !",
+                        sender: "ai",
+                      };
+                      setMessages(prev => [...prev, confirmMessage]);
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    backgroundColor: "#1a1a2a",
+                    paddingVertical: 10,
+                    paddingHorizontal: 12,
+                    borderRadius: 8,
+              alignItems: "center",
+                    borderWidth: 1,
+                    borderColor: "#2a2a4a",
+                  }}
+                >
+                  <Text style={{ color: "#6b6bff", fontWeight: "600", fontSize: 12 }}>
+                    Enregistrer repas
+            </Text>
+          </Pressable>
+        </View>
+            )}
+          </View>
+        )}
+
+
+
+        {/* Bouton liste de courses - affiché seulement après une réponse IA */}
+        {showSaveButtons && (
+          <View style={{ paddingVertical: 4 }}>
+            <Pressable
+              onPress={async () => {
+                try {
+                  // Trouver le dernier message IA avec originalText
+                  const lastAIMessage = messages
+                    .filter(m => m.sender === "ai")
+                    .pop();
+                  
+                  if (!lastAIMessage) {
+                    const errorMessage: Message = {
+                      id: `error_${Date.now()}`,
+                      text: "Aucun message IA trouvé.",
+                      sender: "ai",
+                    };
+                    setMessages(prev => [...prev, errorMessage]);
+                    return;
+                  }
+                  
+                  // TOUJOURS utiliser originalText pour l'extraction des ingrédients
+                  // car il contient les balises <INGREDIENTS>...</INGREDIENTS>
+                  console.log('Debug - lastAIMessage:', lastAIMessage);
+                  console.log('Debug - originalText:', lastAIMessage.originalText);
+                  console.log('Debug - text:', lastAIMessage.text);
+                  
+                  let textToExtract = lastAIMessage.originalText;
+                  
+                  // Si originalText n'est pas disponible, essayer de le récupérer depuis les messages
+                  if (!textToExtract) {
+                    console.log('originalText non disponible, recherche dans les messages...');
+                    // Chercher le dernier message IA dans la liste des messages
+                    const lastAIMessageFromHistory = messages
+                      .filter(msg => msg.sender === 'ai')
+                      .pop();
+                    
+                    if (lastAIMessageFromHistory && lastAIMessageFromHistory.originalText) {
+                      textToExtract = lastAIMessageFromHistory.originalText;
+                      console.log('originalText trouvé dans l\'historique des messages');
+                    } else {
+                      const errorMessage: Message = {
+                        id: `error_${Date.now()}`,
+                        text: "Impossible d'extraire les ingrédients. Le texte original n'est plus disponible.",
+                        sender: "ai",
+                      };
+                      setMessages(prev => [...prev, errorMessage]);
+                      return;
+                    }
+                  }
+                  const extractedItems = extractIngredientsFromAIResponse(textToExtract);
+                  
+                  if (extractedItems.length > 0) {
+                    // Ajouter chaque ingrédient à la liste de courses
+                    for (const item of extractedItems) {
+                      await addShoppingItem({
+                        ...item,
+                        source: "Chat IA",
+                      });
+                    }
+                    
+                    const confirmMessage: Message = {
+                      id: `confirm_${Date.now()}`,
+                      text: `${extractedItems.length} ingrédient(s) ajouté(s) à ta liste de courses !`,
+                      sender: "ai",
+                    };
+                    setMessages(prev => [...prev, confirmMessage]);
+                  } else {
+                    const errorMessage: Message = {
+                      id: `error_${Date.now()}`,
+                      text: "Aucun ingrédient trouvé dans cette réponse.",
+                      sender: "ai",
+                    };
+                    setMessages(prev => [...prev, errorMessage]);
+                  }
+                } catch (error) {
+                  console.error('Erreur ajout liste courses:', error);
+                  const errorMessage: Message = {
+                    id: `error_${Date.now()}`,
+                    text: "Erreur lors de l'ajout à la liste de courses.",
+                    sender: "ai",
+                  };
+                  setMessages(prev => [...prev, errorMessage]);
+                }
+              }}
+              style={{
+                backgroundColor: "#2a1a1a",
+                paddingVertical: 10,
+                paddingHorizontal: 12,
+                borderRadius: 8,
+                alignItems: "center",
+                borderWidth: 1,
+                borderColor: "#4a2a2a",
+              }}
+            >
+              <Text style={{ color: "#ff9f6b", fontWeight: "600", fontSize: 12 }}>
+                Ajouter à ma liste de courses
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
         <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 12 }}>
           <TextInput
             value={input}
             onChangeText={setInput}
-            placeholder="Écris ton message..."
+            placeholder={loading || isTyping ? "🤖 Génération en cours..." : "Écris ton message..."}
+            editable={!loading && !isTyping}
             placeholderTextColor="#777"
             style={{
               flex: 1,
@@ -104,20 +990,24 @@ export default function Chat() {
           />
           <Pressable
             onPress={sendMessage}
+            disabled={loading || isTyping}
             style={{
-              backgroundColor: "#0070F3",
+              backgroundColor: loading || isTyping ? "#333" : "#0070F3",
               paddingVertical: 12,
               paddingHorizontal: 18,
               borderRadius: 12,
             }}
           >
-            <Text style={{ color: "#fff", fontWeight: "700" }}>Envoyer</Text>
+            <Text style={{ color: "#fff", fontWeight: "700" }}>
+              {loading || isTyping ? "…" : "Envoyer"}
+            </Text>
           </Pressable>
         </View>
       </View>
     </KeyboardAvoidingView>
   );
 }
+
 
 
 

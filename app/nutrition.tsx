@@ -51,6 +51,7 @@ export default function Nutrition() {
             </Text>
 
             <Pressable
+              onPress={() => handleAddToShoppingList(m.title, m.ingredients)}
               style={{
                 backgroundColor: "#0070F3",
                 paddingVertical: 10,

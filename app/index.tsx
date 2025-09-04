@@ -15,7 +15,7 @@ export default function SplashScreen() {
       }}
     >
       <Text style={{ color: "#fff", fontSize: 42, fontWeight: "800", letterSpacing: 2 }}>
-        THE SPORT
+        AthletIQ
       </Text>
       <Text style={{ color: "#aaa", fontSize: 16, marginTop: 12, textAlign: "center" }}>
         Ton coach IA pour le sport et la nutrition
