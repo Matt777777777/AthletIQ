@@ -23,8 +23,10 @@ function calculateBMR(profile: UserProfile): number {
 
   // Formule de Mifflin-St Jeor (plus précise que Harris-Benedict)
   // BMR = 10 * poids(kg) + 6.25 * taille(cm) - 5 * âge + s
-  // s = +5 pour hommes, -161 pour femmes (on assume homme par défaut)
-  const bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5;
+  // s = +5 pour hommes, -161 pour femmes
+  // Pour l'instant, on assume homme par défaut (on peut ajouter gender au profil plus tard)
+  const genderFactor = 5; // +5 pour hommes par défaut
+  const bmr = (10 * weight) + (6.25 * height) - (5 * age) + genderFactor;
   
   return Math.round(bmr);
 }
@@ -73,6 +75,15 @@ export function estimateKcalTarget(profile: UserProfile): number {
   
   // Calcul des calories de maintenance
   let target = Math.round(bmr * activityFactor);
+  
+  console.log('Debug BMR calculation:', {
+    age: profile.age,
+    weight: profile.weight,
+    height: profile.height,
+    bmr,
+    activityFactor,
+    target
+  });
 
   // Ajustements selon l'objectif
   const goal = profile.goal?.toLowerCase() || "";
@@ -80,12 +91,17 @@ export function estimateKcalTarget(profile: UserProfile): number {
   if (goal.includes("perdre") || goal.includes("perte")) {
     // Déficit calorique pour la perte de poids (15-20% de déficit)
     target = Math.round(target * 0.8);
+    console.log('Ajustement perte de poids:', { goal, target });
   } else if (goal.includes("prendre") || goal.includes("muscle") || goal.includes("masse")) {
     // Surplus calorique pour la prise de muscle (10-15% de surplus)
     target = Math.round(target * 1.15);
+    console.log('Ajustement prise de masse:', { goal, target });
   } else if (goal.includes("maintenir") || goal.includes("forme")) {
     // Calories de maintenance
     // Pas d'ajustement
+    console.log('Ajustement maintien:', { goal, target });
+  } else {
+    console.log('Aucun ajustement d\'objectif:', { goal, target });
   }
 
   // Ajustement selon le régime alimentaire

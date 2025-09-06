@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { saveProfile } from "../lib/profile";
 
 const goals = ["Perdre du poids", "Prendre du muscle", "Être en forme"];
@@ -51,10 +51,22 @@ export default function Onboarding() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#000", paddingTop: 80, paddingHorizontal: 20 }}>
+    <KeyboardAvoidingView 
+      style={{ flex: 1, backgroundColor: "#000" }} 
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+    >
+      <View style={{ flex: 1, paddingTop: 80, paddingHorizontal: 20 }}>
       <Text style={{ color: "#fff", fontSize: 28, fontWeight: "800", marginBottom: 16 }}>
         Onboarding
       </Text>
+        
+        <ScrollView 
+          style={{ flex: 1 }} 
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
 
       {step === 1 && (
         <View style={{ gap: 12 }}>
@@ -234,8 +246,9 @@ export default function Onboarding() {
           </Text>
         </View>
       )}
+        </ScrollView>
 
-      <View style={{ marginTop: "auto", paddingVertical: 24 }}>
+        <View style={{ paddingVertical: 24 }}>
         <Pressable
           onPress={next}
           disabled={(step === 1 && !goal) || (step === 3 && !diet)}
@@ -248,13 +261,13 @@ export default function Onboarding() {
           }}
         >
           <Text style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>
-            {step < 4 ? "Continuer" : "Terminer"}
+              {step < 4 ? "Continuer" : "Terminer"}
           </Text>
         </Pressable>
 
         {step > 1 && (
           <Pressable
-            onPress={() => setStep((s) => (s - 1) as 1 | 2 | 3 | 4)}
+              onPress={() => setStep((s) => (s - 1) as 1 | 2 | 3 | 4)}
             style={{ paddingVertical: 14, alignItems: "center" }}
           >
             <Text style={{ color: "#aaa" }}>Retour</Text>
@@ -262,6 +275,7 @@ export default function Onboarding() {
         )}
       </View>
     </View>
+    </KeyboardAvoidingView>
   );
 }
 

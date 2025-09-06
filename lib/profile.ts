@@ -80,7 +80,7 @@ export type UserProfile = {
     } | null;
   };
 
-  // Séance du jour
+  // Séance du jour (compatibilité)
   dailyWorkout?: {
     id: string;
     title: string;
@@ -90,6 +90,18 @@ export type UserProfile = {
     completed: boolean;
     completedAt?: string;
   } | null;
+  
+  // Séances du jour (nouveau format - support 2 séances)
+  dailyWorkouts?: Array<{
+    id: string;
+    title: string;
+    content: string;
+    duration: number; // en minutes
+    calories: number; // calories estimées
+    completed: boolean;
+    completedAt?: string;
+    sessionType: 'morning' | 'evening'; // Type de séance
+  }>;
 };
 
 const KEY = "the_sport_profile_v1";

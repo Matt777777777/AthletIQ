@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import React, { useEffect, useRef, useState } from "react";
+import { FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, TouchableWithoutFeedback, View } from "react-native";
 import { estimateKcalTarget } from "../lib/nutrition";
 import { loadProfile, saveDailyMeal, savePlan, saveProfile, UserProfile } from "../lib/profile";
 import { addShoppingItem, extractIngredientsFromAIResponse } from "../lib/shopping";
@@ -49,24 +50,42 @@ export default function Chat() {
 
   // Fonction pour extraire le titre du plat depuis la réponse IA
   const extractMealTitle = (content: string): string => {
+    console.log("🔍 extractMealTitle - Contenu reçu:", content.substring(0, 200) + "...");
+    
     // Diviser le contenu en lignes et filtrer les lignes vides
     const lines = content.split('\n').filter(line => line.trim().length > 0);
+    console.log("🔍 extractMealTitle - Lignes:", lines);
     
-    // Si on a au moins 1 ligne, prendre la première ligne comme titre (nom du plat)
-    if (lines.length >= 1) {
-      const firstLine = lines[0].trim();
-      // Nettoyer la ligne (enlever les deux-points, etc.)
-      let cleanedTitle = firstLine.replace(/[:•\-\*]/g, '').trim();
+    // Chercher le titre dans les premières lignes
+    for (let i = 0; i < Math.min(3, lines.length); i++) {
+      const line = lines[i].trim();
+      console.log(`🔍 extractMealTitle - Ligne ${i}:`, line);
       
-      // Supprimer les préfixes de repas
-      cleanedTitle = cleanedTitle.replace(/^(PetitDéjeuner|Petit-déjeuner|Déjeuner|Dîner|Collation|Snack)\s*:?\s*/i, '');
+      // Ignorer les lignes qui commencent par des mots-clés de repas
+      if (/^(PetitDéjeuner|Petit-déjeuner|Déjeuner|Dîner|Collation|Snack|Voici|Je te propose|Recette)/i.test(line)) {
+        continue;
+      }
       
-      return cleanedTitle;
+      // Ignorer les lignes trop courtes ou qui contiennent des instructions
+      if (line.length < 5 || /^(Ingrédients|Préparation|Instructions|Étapes|1\.|2\.|3\.)/i.test(line)) {
+        continue;
+      }
+      
+      // Nettoyer la ligne
+      let cleanedTitle = line.replace(/[:•\-\*#]/g, '').trim();
+      
+      // Si la ligne nettoyée fait au moins 5 caractères, c'est probablement le titre
+      if (cleanedTitle.length >= 5) {
+        console.log("🔍 extractMealTitle - Titre trouvé:", cleanedTitle);
+        return cleanedTitle;
+      }
     }
 
     // Fallback: retourner un titre générique
+    console.log("🔍 extractMealTitle - Fallback utilisé");
     return "Recette générée";
   };
+
 
   // Fonction pour nettoyer le contenu de la recette
   const cleanMealContent = (content: string): string => {
@@ -105,6 +124,48 @@ export default function Chat() {
     
     return content;
   };
+
+  // Fonction pour nettoyer le contenu de la séance
+  const cleanWorkoutContent = (content: string): string => {
+    // Diviser le contenu en lignes et filtrer les lignes vides
+    const lines = content.split('\n').filter(line => line.trim().length > 0);
+    
+    // Si on a au moins 2 lignes, supprimer seulement la première ligne (titre)
+    if (lines.length >= 2) {
+      // Prendre toutes les lignes sauf la première (qui est le titre)
+      const contentLines = lines.slice(1);
+      return contentLines.join('\n').trim();
+    }
+    
+    // Si on a seulement une ligne, essayer de nettoyer avec les patterns
+    if (lines.length === 1) {
+      const introPatterns = [
+        /Voici une séance de [^:]+ pour [^:]+:/gi,
+        /Voici une séance de [^:]+:/gi,
+        /Voici [^:]+ pour [^:]+:/gi,
+        /Voici [^:]+:/gi,
+        /Je te propose [^:]+:/gi,
+        /Voici [^:]+ adapté:/gi,
+        /Voici [^:]+ parfait:/gi,
+      ];
+
+      let cleanedContent = content;
+      
+      for (const pattern of introPatterns) {
+        cleanedContent = cleanedContent.replace(pattern, '').trim();
+      }
+
+      // Nettoyer les espaces et sauts de ligne en début
+      cleanedContent = cleanedContent.replace(/^\s*\n+/, '').trim();
+      
+      return cleanedContent;
+    }
+
+    // Fallback: retourner le contenu tel quel
+    return content;
+  };
+
+
 
   // Fonction pour détecter si la réponse contient plusieurs repas du jour
   const detectMultipleMeals = (content: string): boolean => {
@@ -283,14 +344,21 @@ export default function Chat() {
             ]);
           }
         } else {
-          // Pas de profil, message d'accueil générique
+          // Pas de profil, poser les questions
           setMessages([
             {
               id: "welcome",
-              text: "Salut ! Je suis ton coach IA. Commence par faire ton onboarding pour des conseils personnalisés !",
+              text: "Salut ! Je suis ton coach IA. Pour créer un programme parfaitement adapté à tes besoins, j'aimerais te poser quelques questions :",
               sender: "ai",
             },
+            {
+              id: "question_0",
+              text: `1/5 - ${profileQuestions[0]}`,
+              sender: "ai",
+            }
           ]);
+          setIsAskingProfileQuestions(true);
+          setCurrentQuestionIndex(0);
         }
       } catch (error) {
         console.error("Erreur lors de l'initialisation du chat:", error);
@@ -306,6 +374,42 @@ export default function Chat() {
 
     initializeChat();
   }, []);
+
+  // Recharger le profil quand on revient sur l'onglet chat
+  useFocusEffect(
+    React.useCallback(() => {
+      const reloadProfile = async () => {
+        try {
+          const loadedProfile = await loadProfile();
+          setProfile(loadedProfile);
+        } catch (error) {
+          console.error("Erreur lors du rechargement du profil:", error);
+        }
+      };
+      reloadProfile();
+    }, [])
+  );
+
+  // Surveiller les changements de chatQuestionsAsked pour redémarrer l'onboarding
+  useEffect(() => {
+    if (profile && !profile.chatQuestionsAsked && !isAskingProfileQuestions && messages.length === 0) {
+      console.log("Redémarrage de l'onboarding détecté");
+      setMessages([
+        {
+          id: "welcome",
+          text: "Salut ! Je suis ton coach IA. Pour créer un programme parfaitement adapté à tes besoins, j'aimerais te poser quelques questions :",
+          sender: "ai",
+        },
+        {
+          id: "question_0",
+          text: `1/5 - ${profileQuestions[0]}`,
+          sender: "ai",
+        }
+      ]);
+      setIsAskingProfileQuestions(true);
+      setCurrentQuestionIndex(0);
+    }
+  }, [profile?.chatQuestionsAsked]);
 
   // Fonction pour traiter une réponse et mettre à jour le profil
   const handleProfileAnswer = async (answer: string) => {
@@ -372,7 +476,12 @@ export default function Chat() {
         
         // Marquer que les questions ont été posées
         try {
-          const finalProfile = { ...profile, chatQuestionsAsked: true };
+          const finalProfile = { 
+            ...profile, 
+            ...profileUpdates,
+            chatResponses: updatedChatResponses,
+            chatQuestionsAsked: true 
+          };
           await saveProfile(finalProfile);
           setProfile(finalProfile);
           console.log("Questions marquées comme posées");
@@ -528,6 +637,7 @@ export default function Chat() {
         systemPrompt += `\n  * Total des 4 repas = ${kcalTarget} kcal`;
       }
 
+
               systemPrompt += "\n\nFORMAT RECETTES - Utilise TOUJOURS :" +
         "\n<INGREDIENTS>" +
         "\n{\"ingredients\": [{\"name\": \"nom\", \"quantity\": \"qty\", \"unit\": \"unité\", \"category\": \"catégorie\"}]}" +
@@ -646,21 +756,38 @@ export default function Chat() {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: "#000" }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
     >
-      <View style={{ flex: 1, paddingTop: 60, paddingHorizontal: 12 }}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 60, paddingHorizontal: 12, marginBottom: 12 }}>
           <Text style={{ color: "#fff", fontSize: 22, fontWeight: "800" }}>
             Ton coach IA
           </Text>
+          <Pressable
+            onPress={Keyboard.dismiss}
+            style={{
+              backgroundColor: "#333",
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+            borderRadius: 8, 
+            }}
+          >
+            <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
+              Fermer clavier
+            </Text>
+          </Pressable>
           </View>
 
         <FlatList
           ref={listRef}
           data={messages}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingBottom: 12 }}
+          contentContainerStyle={{ paddingBottom: 12, paddingHorizontal: 12, flexGrow: 1 }}
+          showsVerticalScrollIndicator={true}
+          scrollEnabled={true}
+          nestedScrollEnabled={true}
           renderItem={({ item }) => (
             <View
               style={{
@@ -673,7 +800,7 @@ export default function Chat() {
               }}
             >
               <Text style={{ color: "#fff", lineHeight: 20 }}>
-                {item.text}
+                {cleanText(item.text)}
                 {item.sender === "ai" && isTyping && item.text === "" && (
                   <Text style={{ color: "#666" }}>🤖 écrit...</Text>
                 )}
@@ -740,7 +867,9 @@ export default function Chat() {
                 <View style={{ flexDirection: "row", gap: 8 }}>
           <Pressable
                     onPress={async () => {
-                      const success = await savePlan('workout', 'Séance générée', lastAIResponse?.text || '');
+                      const workoutTitle = "Séance de sport";
+                      const workoutContent = cleanWorkoutContent(lastAIResponse?.text || '');
+                      const success = await savePlan('workout', workoutTitle, workoutContent);
                       if (success) {
                         const updatedProfile = await loadProfile();
                         setProfile(updatedProfile);
@@ -770,7 +899,9 @@ export default function Chat() {
 
           <Pressable
                     onPress={async () => {
-                      const success = await savePlan('meal', 'Repas généré', lastAIResponse?.text || '');
+                      const mealTitle = extractMealTitle(lastAIResponse?.text || '');
+                      const mealContent = cleanMealContent(lastAIResponse?.text || '');
+                      const success = await savePlan('meal', mealTitle, mealContent);
                       if (success) {
                         const updatedProfile = await loadProfile();
                         setProfile(updatedProfile);
@@ -804,7 +935,9 @@ export default function Chat() {
               <View style={{ flexDirection: "row", gap: 8 }}>
           <Pressable
                   onPress={async () => {
-                    const success = await savePlan('workout', 'Séance générée', lastAIResponse?.text || '');
+                    const workoutTitle = "Séance de sport";
+                    const workoutContent = cleanWorkoutContent(lastAIResponse?.text || '');
+                    const success = await savePlan('workout', workoutTitle, workoutContent);
                     if (success) {
                       const updatedProfile = await loadProfile();
                       setProfile(updatedProfile);
@@ -834,13 +967,15 @@ export default function Chat() {
 
                 <Pressable
                   onPress={async () => {
-                    const success = await savePlan('meal', 'Repas généré', lastAIResponse?.text || '');
+                    const workoutTitle = "Séance de sport";
+                    const workoutContent = cleanWorkoutContent(lastAIResponse?.text || '');
+                    const success = await savePlan('workout', workoutTitle, workoutContent);
                     if (success) {
                       const updatedProfile = await loadProfile();
                       setProfile(updatedProfile);
                       const confirmMessage: Message = {
                         id: `confirm_${Date.now()}`,
-                        text: "Repas enregistré dans tes plans !",
+                        text: "Séance enregistrée dans tes plans !",
                         sender: "ai",
                       };
                       setMessages(prev => [...prev, confirmMessage]);
@@ -970,7 +1105,13 @@ export default function Chat() {
           </View>
         )}
 
-        <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 12 }}>
+        <View style={{ 
+          flexDirection: "row", 
+          alignItems: "center", 
+          paddingVertical: 8,
+          paddingBottom: Platform.OS === "ios" ? 8 : 12,
+          backgroundColor: "#000"
+        }}>
           <TextInput
             value={input}
             onChangeText={setInput}
@@ -987,6 +1128,8 @@ export default function Chat() {
             }}
             onSubmitEditing={sendMessage}
             returnKeyType="send"
+            blurOnSubmit={true}
+            multiline={false}
           />
           <Pressable
             onPress={sendMessage}
@@ -1004,6 +1147,7 @@ export default function Chat() {
           </Pressable>
         </View>
       </View>
+      </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
 }

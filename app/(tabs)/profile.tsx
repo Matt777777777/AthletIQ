@@ -367,48 +367,6 @@ export default function Profile() {
     setShowPlanDetail(true);
   };
 
-  const deleteSelectedPlan = async () => {
-    if (!selectedPlan) return;
-    
-    console.log(`deleteSelectedPlan called for ${selectedPlan.type}: ${selectedPlan.title}`);
-    
-    // Pour la simulation sur ordinateur, on peut bypasser l'Alert
-    const isSimulator = __DEV__ && Platform.OS === 'web';
-    
-    if (isSimulator) {
-      // Suppression directe en simulation
-      console.log(`Simulator mode: deleting plan directly`);
-      const success = await deletePlan(selectedPlan.type, selectedPlan.id);
-      if (success) {
-        setShowPlanDetail(false);
-        setSelectedPlan(null);
-        loadUserProfile();
-      }
-      return;
-    }
-    
-    Alert.alert(
-      "Supprimer le plan",
-      `Êtes-vous sûr de vouloir supprimer "${selectedPlan.title}" ?`,
-      [
-        { text: "Annuler", style: "cancel" },
-        {
-          text: "Supprimer",
-          style: "destructive",
-          onPress: async () => {
-            console.log(`User confirmed deletion of ${selectedPlan.type}: ${selectedPlan.title}`);
-            const success = await deletePlan(selectedPlan.type, selectedPlan.id);
-            if (success) {
-              setShowPlanDetail(false);
-              setSelectedPlan(null);
-              // Recharger le profil pour mettre à jour l'affichage
-              loadUserProfile();
-            }
-          }
-        }
-      ]
-    );
-  };
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: "#000" }} contentContainerStyle={{ paddingTop: 60, paddingHorizontal: 16, paddingBottom: 20 }}>
@@ -1023,17 +981,12 @@ export default function Profile() {
             </Text>
             {profile?.savedPlans?.workouts?.length ? (
               profile.savedPlans.workouts.slice(-3).reverse().map((workout) => {
-                const extractedTitle = extractWorkoutTitle(workout.content);
                 const cleanedContent = cleanWorkoutContent(workout.content);
                 
                 return (
                   <Pressable
                     key={workout.id}
-                    onPress={() => openPlanDetail('workout', {
-                      ...workout,
-                      title: extractedTitle,
-                      content: cleanedContent
-                    })}
+                    onPress={() => openPlanDetail('workout', workout)}
                     style={{ 
                       backgroundColor: "#1a2a1a", 
                       padding: 12, 
@@ -1044,7 +997,7 @@ export default function Profile() {
                     }}
                   >
                     <Text style={{ color: "#fff", fontWeight: "600", fontSize: 14 }}>
-                      {extractedTitle}
+                      {workout.title}
                     </Text>
                     <Text style={{ color: "#aaa", fontSize: 12, marginTop: 4 }}>
                       Sauvegardé le {new Date(workout.date).toLocaleDateString('fr-FR', {
@@ -1064,7 +1017,7 @@ export default function Profile() {
                       <Pressable
                         onPress={async (e) => {
                           e.stopPropagation(); // Empêcher l'ouverture de la modal
-                          console.log(`Delete workout from list: ${extractedTitle}`);
+                          console.log(`Delete workout from list: ${workout.title}`);
                           
                           // Pour la simulation sur ordinateur, on peut bypasser l'Alert
                           const isSimulator = __DEV__ && Platform.OS === 'web';
@@ -1081,14 +1034,14 @@ export default function Profile() {
                           
                           Alert.alert(
                             "Supprimer la séance",
-                            `Êtes-vous sûr de vouloir supprimer "${extractedTitle}" ?`,
+                            `Êtes-vous sûr de vouloir supprimer "${workout.title}" ?`,
                             [
                               { text: "Annuler", style: "cancel" },
                               {
                                 text: "Supprimer",
                                 style: "destructive",
                                 onPress: async () => {
-                                  console.log(`User confirmed deletion of workout: ${extractedTitle}`);
+                                  console.log(`User confirmed deletion of workout: ${workout.title}`);
                                   const success = await deletePlan('workout', workout.id);
                                   if (success) {
                                     loadUserProfile();
@@ -1146,7 +1099,7 @@ export default function Profile() {
                     key={meal.id}
                     onPress={() => openPlanDetail('meal', {
                       ...meal,
-                      title: extractedTitle,
+                      title: meal.title,
                       content: cleanedContent
                     })}
                     style={{ 
@@ -1159,7 +1112,7 @@ export default function Profile() {
                     }}
                   >
                     <Text style={{ color: "#fff", fontWeight: "600", fontSize: 14 }}>
-                      {mealType}: {extractedTitle}
+                      {meal.title}
                     </Text>
                     <Text style={{ color: "#aaa", fontSize: 12, marginTop: 4 }}>
                       Sauvegardé le {new Date(meal.date).toLocaleDateString('fr-FR', {
@@ -1310,34 +1263,19 @@ export default function Profile() {
             borderBottomColor: "#333"
           }}>
             <Text style={{ color: "#fff", fontSize: 20, fontWeight: "700" }}>
-              {selectedPlan?.type === 'workout' ? 'Séance' : 'Repas'} {selectedPlan?.title}
+              {selectedPlan?.title}
             </Text>
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              <Pressable
-                onPress={deleteSelectedPlan}
-                style={{
-                  backgroundColor: "#4a1a1a",
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: "#6a2a2a"
-                }}
-              >
-                <Text style={{ color: "#ff6b6b", fontWeight: "600" }}>🗑</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setShowPlanDetail(false)}
-                style={{
-                  backgroundColor: "#333",
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  borderRadius: 8
-                }}
-              >
-                <Text style={{ color: "#fff", fontWeight: "600" }}>Fermer</Text>
-              </Pressable>
-            </View>
+            <Pressable
+              onPress={() => setShowPlanDetail(false)}
+              style={{
+                backgroundColor: "transparent",
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 8
+              }}
+            >
+              <Text style={{ color: "transparent", fontWeight: "600" }}>Fermer</Text>
+            </Pressable>
           </View>
 
           {/* Contenu du plan */}

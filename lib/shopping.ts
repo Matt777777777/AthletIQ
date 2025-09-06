@@ -54,21 +54,40 @@ export async function addShoppingItem(item: Omit<ShoppingItem, "id" | "dateAdded
 
 // ✅ Toggle case cochée
 export async function toggleItem(id: string) {
-  console.log(`toggleItem called with id: ${id}`);
   const all = await getAll();
-  console.log(`Total items before toggle: ${all.length}`);
-  console.log(`Items with same id: ${all.filter(item => item.id === id).length}`);
   
+  // Vérifier si c'est un élément groupé
+  if (id.startsWith('grouped_')) {
+    const name = id.replace('grouped_', '').split('_')[0];
+    const category = id.replace('grouped_', '').split('_').slice(1).join('_');
+    
+    // Trouver tous les éléments avec le même nom et la même catégorie
+    const sameNameItems = all.filter(item => 
+      item.name.toLowerCase() === name.toLowerCase() && 
+      item.category === category
+    );
+    
+    // Toggle tous les éléments avec le même nom
+    const updated = all.map(item => {
+      if (item.name.toLowerCase() === name.toLowerCase() && item.category === category) {
+        return { ...item, checked: !item.checked };
+      }
+      return item;
+    });
+    
+    await setAll(updated);
+    return;
+  }
+  
+  // Toggle un élément individuel
   const updated = all.map(item => {
     if (item.id === id) {
-      console.log(`Toggling item: ${item.name} from ${item.checked} to ${!item.checked}`);
       return { ...item, checked: !item.checked };
     }
     return item;
   });
   
   await setAll(updated);
-  console.log(`Toggle completed for id: ${id}`);
 }
 
 // ❌ Supprimer un ingrédient
@@ -93,11 +112,54 @@ export async function getItemsByCategory(): Promise<Record<string, ShoppingItem[
   const all = await getAll();
   const grouped: Record<string, ShoppingItem[]> = {};
   
+  // Grouper par nom d'abord, puis par catégorie
+  const itemsByName: Record<string, ShoppingItem[]> = {};
   all.forEach(item => {
-    if (!grouped[item.category]) {
-      grouped[item.category] = [];
+    const key = `${item.name.toLowerCase()}_${item.category}`;
+    if (!itemsByName[key]) {
+      itemsByName[key] = [];
     }
-    grouped[item.category].push(item);
+    itemsByName[key].push(item);
+  });
+  
+  // Créer des éléments groupés
+  Object.values(itemsByName).forEach(items => {
+    if (items.length === 0) return;
+    
+    const firstItem = items[0];
+    const category = firstItem.category;
+    
+    if (!grouped[category]) {
+      grouped[category] = [];
+    }
+    
+    if (items.length === 1) {
+      // Un seul élément, l'ajouter tel quel
+      grouped[category].push(firstItem);
+    } else {
+      // Plusieurs éléments avec le même nom, les grouper
+      const totalQuantity = items.reduce((sum, item) => {
+        const qty = parseFloat(item.quantity) || 1;
+        return sum + qty;
+      }, 0);
+      
+      const allChecked = items.every(item => item.checked);
+      const anyChecked = items.some(item => item.checked);
+      
+      // Créer un élément groupé
+      const groupedItem: ShoppingItem = {
+        id: `grouped_${firstItem.name}_${firstItem.category}`,
+        name: firstItem.name,
+        quantity: totalQuantity.toString(),
+        unit: firstItem.unit,
+        category: firstItem.category,
+        checked: allChecked,
+        dateAdded: items[0].dateAdded,
+        source: "Groupé"
+      };
+      
+      grouped[category].push(groupedItem);
+    }
   });
   
   return grouped;

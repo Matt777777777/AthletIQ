@@ -47,11 +47,9 @@ export default function Shopping() {
   );
 
   const handleToggle = async (id: string) => {
-    console.log(`handleToggle called for id: ${id}`);
     setLoading(true); // Désactiver les interactions pendant le toggle
     try {
       await toggleItem(id);
-      console.log(`Refreshing after toggle for id: ${id}`);
       await refresh();
     } catch (error) {
       console.error('Error toggling item:', error);

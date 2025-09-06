@@ -1,7 +1,7 @@
 // app/dashboard.tsx
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Link, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { DailyIntake, estimateKcalTarget, loadDailyIntake, saveDailyIntake } from "../lib/nutrition";
 import { latestByType, SavedPlan } from "../lib/plans";
@@ -19,7 +19,6 @@ export default function Dashboard() {
   const [hasHealthPermissions, setHasHealthPermissions] = useState<boolean>(false);
   
   // États pour les macronutriments
-  const [showMacronutrients, setShowMacronutrients] = useState(false);
   const [macronutrients, setMacronutrients] = useState({
     carbs: 0, // glucides en grammes
     protein: 0, // protéines en grammes
@@ -34,8 +33,8 @@ export default function Dashboard() {
     dinner: null as { id: string; title: string; content: string; date: string; eaten?: boolean } | null
   });
 
-  // États pour la séance du jour
-  const [dailyWorkout, setDailyWorkout] = useState<{
+  // États pour les séances du jour (support 2 séances max)
+  const [dailyWorkouts, setDailyWorkouts] = useState<Array<{
     id: string;
     title: string;
     content: string;
@@ -43,7 +42,33 @@ export default function Dashboard() {
     calories: number; // calories estimées
     completed: boolean;
     completedAt?: string;
+    sessionType: 'morning' | 'evening'; // Type de séance
+  }>>([]);
+
+  // États pour la modal de détail des séances
+  const [showWorkoutModal, setShowWorkoutModal] = useState(false);
+  const [selectedWorkout, setSelectedWorkout] = useState<{
+    id: string;
+    title: string;
+    content: string;
+    duration: number;
+    calories: number;
+    completed: boolean;
+    completedAt?: string;
+    sessionType: 'morning' | 'evening';
   } | null>(null);
+
+  // États pour l'import de séances
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [savedWorkouts, setSavedWorkouts] = useState<Array<{ id: string; title: string; content: string; date: string }>>([]);
+
+  // État pour forcer la mise à jour du cercle de progression
+  const [circleKey, setCircleKey] = useState(0);
+
+  // Mémoriser les états des workouts pour éviter les re-renders infinis
+  const workoutStates = useMemo(() => {
+    return dailyWorkouts.map(w => w.completed);
+  }, [dailyWorkouts]);
 
   // États pour la modal de détail des repas
   const [selectedMeal, setSelectedMeal] = useState<{ id: string; title: string; content: string; date: string } | null>(null);
@@ -57,6 +82,221 @@ export default function Dashboard() {
   const [manualMealTitle, setManualMealTitle] = useState('');
   const [manualMealContent, setManualMealContent] = useState('');
   const [savedMeals, setSavedMeals] = useState<Array<{ id: string; title: string; content: string; date: string }>>([]);
+
+  // Fonction pour extraire le titre d'une séance
+  const extractWorkoutTitle = (content: string): string => {
+    const lines = content.split('\n').filter(line => line.trim().length > 0);
+    const firstLine = lines[0]?.trim();
+    
+    // Si la première ligne contient "Voici une séance" ou similaire, prendre la suivante
+    if (firstLine && /voici|séance|entraînement|workout/i.test(firstLine)) {
+      return lines[1]?.trim() || firstLine;
+    }
+    
+    return firstLine || 'Séance sans titre';
+  };
+
+  // Fonction pour estimer les calories d'une séance
+  const estimateWorkoutCalories = (content: string, profile: UserProfile | null): number => {
+    if (!profile) return 300; // Estimation par défaut
+    
+    // Estimation basée sur la durée et le poids
+    const duration = 45; // Durée par défaut en minutes
+    const weight = profile.weight || 70; // Poids par défaut
+    
+    // Estimation : 8-12 calories par minute selon l'intensité
+    const caloriesPerMinute = (weight / 70) * 10; // Ajustement selon le poids
+    return Math.round(duration * caloriesPerMinute);
+  };
+
+  // Fonction pour extraire les sections d'une séance
+  const extractWorkoutSections = (content: string) => {
+    const sections: {
+      warmup: string[];
+      main: string[];
+      cooldown: string[];
+    } = {
+      warmup: [],
+      main: [],
+      cooldown: []
+    };
+
+    const lines = content.split('\n').filter(line => line.trim().length > 0);
+    let currentSection: 'warmup' | 'main' | 'cooldown' = 'main'; // Par défaut, circuit principal
+
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      
+      // Détecter les sections
+      if (/échauffement|warmup|warm-up/i.test(trimmedLine)) {
+        currentSection = 'warmup';
+        continue;
+      } else if (/circuit principal|exercices principaux|main|workout/i.test(trimmedLine)) {
+        currentSection = 'main';
+        continue;
+      } else if (/récupération|récovery|cooldown|cool-down|étirements/i.test(trimmedLine)) {
+        currentSection = 'cooldown';
+        continue;
+      }
+
+      // Ignorer les lignes "Matériel :" et "Description :" seulement dans la section Circuit principal
+      if (currentSection === 'main' && (/^matériel\s*:?$/i.test(trimmedLine) || /^description\s*:?$/i.test(trimmedLine))) {
+        continue;
+      }
+
+      // Ajouter la ligne à la section appropriée
+      if (trimmedLine.length > 0) {
+        sections[currentSection].push(trimmedLine);
+      }
+    }
+
+    return sections;
+  };
+
+  // Fonction pour extraire le matériel d'une séance
+  const extractWorkoutEquipment = (content: string): string => {
+    const lines = content.split('\n');
+    for (const line of lines) {
+      if (/matériel\s*:/i.test(line)) {
+        return line.replace(/matériel\s*:\s*/i, '').trim();
+      }
+    }
+    return 'Aucun';
+  };
+
+  // Calcul des calories brûlées du jour (séances uniquement)
+  const calculateDailyCaloriesBurned = () => {
+    let totalCalories = 0;
+
+    // Calories des séances terminées (toutes les séances)
+    dailyWorkouts.forEach((workout, index) => {
+      if (workout.completed && workout.calories && workout.calories > 0) {
+        totalCalories += workout.calories;
+        console.log(`Workout ${index + 1} calories:`, { 
+          sessionType: workout.sessionType,
+          completed: workout.completed, 
+          calories: workout.calories, 
+          totalCalories 
+        });
+      }
+    });
+
+    // S'assurer qu'on retourne une valeur valide
+    const result = Math.max(0, totalCalories);
+    console.log('Total workout calories burned:', result);
+    return isNaN(result) ? 0 : result;
+  };
+
+  // Calcul des calories totales brûlées (séances + pas) - pour usage général
+  const calculateTotalCaloriesBurned = () => {
+    let totalCalories = 0;
+
+    // Calories des pas (estimation basée sur le profil complet)
+    if (profile && dailySteps.steps > 0) {
+      // Calcul plus précis basé sur le poids, la taille et le sexe
+      const weight = profile.weight || 70; // kg
+      const height = profile.height || 170; // cm
+      const gender = profile.gender || 'male';
+      const age = profile.age || 30; // ans
+      
+      // Calcul de la longueur de foulée basée sur la taille
+      const strideLength = height * 0.43; // 43% de la taille en cm
+      const stepsPerKm = 100000 / strideLength; // Nombre de pas par km
+      const actualDistanceKm = dailySteps.steps / stepsPerKm;
+      
+      // Calcul du MET (Metabolic Equivalent) pour la marche
+      let met = 3.5;
+      if (gender === 'female') {
+        met = 3.3; // Légèrement plus bas pour les femmes
+      }
+      
+      // Ajustement selon l'âge (légèrement plus bas avec l'âge)
+      if (age > 50) {
+        met *= 0.95;
+      }
+      
+      // Calcul des calories : MET × poids(kg) × temps(heures)
+      const timeHours = actualDistanceKm / 5; // 5 km/h de vitesse moyenne
+      const stepsCalories = Math.round(met * weight * timeHours);
+      
+      totalCalories += stepsCalories;
+    }
+
+    // Calories des séances terminées
+    dailyWorkouts.forEach((workout) => {
+      if (workout.completed && workout.calories && workout.calories > 0) {
+        totalCalories += workout.calories;
+      }
+    });
+
+    return Math.max(0, totalCalories);
+  };
+
+  // Calcul de l'objectif calorique du jour
+  const calculateDailyCalorieGoal = () => {
+    if (!profile) return 500; // Objectif par défaut
+
+    try {
+      const kcalTarget = estimateKcalTarget(profile);
+      console.log('Debug estimateKcalTarget:', { 
+        profile: { 
+          age: profile.age, 
+          weight: profile.weight, 
+          height: profile.height, 
+          goal: profile.goal 
+        }, 
+        kcalTarget 
+      });
+      
+      if (!kcalTarget || isNaN(kcalTarget) || kcalTarget <= 0) {
+        console.log('kcalTarget invalide, utilisation de 500');
+        return 500; // Valeur par défaut si estimation invalide
+      }
+
+      const caloriesConsumed = dailyIntake.kcal || 0;
+      const caloriesBurned = calculateDailyCaloriesBurned();
+      
+      // Adapter l'objectif selon l'objectif de l'utilisateur (séances uniquement)
+      let activityGoal;
+      
+      if (profile.goal === 'Perte de poids') {
+        // Pour la perte de poids : objectif élevé pour créer un déficit calorique
+        // Objectif de dépense = 30-35% de l'objectif nutritionnel (séances uniquement)
+        activityGoal = Math.round(kcalTarget * 0.325);
+      } else if (profile.goal === 'Prise de masse') {
+        // Pour la prise de masse : objectif très élevé pour compenser l'excédent calorique
+        // Objectif de dépense = 35-40% de l'objectif nutritionnel (séances uniquement)
+        activityGoal = Math.round(kcalTarget * 0.375);
+      } else if (profile.goal === 'Maintien') {
+        // Pour le maintien : objectif équilibré pour les séances
+        // Objectif de dépense = 25-30% de l'objectif nutritionnel (séances uniquement)
+        activityGoal = Math.round(kcalTarget * 0.275);
+      } else {
+        // Objectif par défaut
+        activityGoal = Math.round(kcalTarget * 0.275);
+      }
+      
+      // S'assurer que l'objectif est raisonnable (minimum 300, maximum 1500)
+      const finalGoal = Math.max(300, Math.min(1500, activityGoal));
+      console.log('Debug final goal:', { 
+        kcalTarget, 
+        caloriesConsumed, 
+        caloriesBurned, 
+        deficit: caloriesConsumed - caloriesBurned,
+        activityGoal, 
+        finalGoal 
+      });
+      return finalGoal;
+    } catch (error) {
+      console.error('Erreur dans calculateDailyCalorieGoal:', error);
+      return 500; // Valeur par défaut en cas d'erreur
+    }
+  };
+
+  // Forcer la mise à jour du cercle de progression
+  useEffect(() => {
+    setCircleKey(prev => prev + 1);
+  }, [dailyIntake.kcal, dailySteps.steps, workoutStates, profile?.goal]);
 
   const loadData = useCallback(async () => {
     try {
@@ -77,20 +317,46 @@ export default function Dashboard() {
       setDailySteps(stepsData);
       setHasHealthPermissions(permissionsData);
 
-      // Charger la séance du jour depuis le profil
-      if (profileData?.dailyWorkout) {
-        setDailyWorkout(profileData.dailyWorkout);
+      // Charger les séances sauvegardées
+      if (profileData?.savedPlans?.workouts) {
+        const workouts = profileData.savedPlans.workouts.map(workout => ({
+          id: workout.id,
+          title: extractWorkoutTitle(workout.content),
+          content: workout.content,
+          date: workout.date
+        }));
+        setSavedWorkouts(workouts);
+      }
+
+      // Charger les séances du jour depuis le profil
+      if (profileData?.dailyWorkouts && Array.isArray(profileData.dailyWorkouts)) {
+        // Nouvelles séances multiples
+        const workouts = profileData.dailyWorkouts.map((workout: any) => ({
+          ...workout,
+          calories: workout.calories || estimateWorkoutCalories(workout.content, profileData)
+        }));
+        setDailyWorkouts(workouts);
+      } else if (profileData?.dailyWorkout) {
+        // Ancien format (compatibilité)
+        const workout = profileData.dailyWorkout;
+        const estimatedCalories = workout.calories || estimateWorkoutCalories(workout.content, profileData);
+        setDailyWorkouts([{
+          ...workout,
+          calories: estimatedCalories,
+          sessionType: 'morning' as const
+        }]);
       } else if (workoutData) {
         // Si pas de séance du jour, utiliser la dernière séance comme base
         const estimatedCalories = estimateWorkoutCalories(workoutData.content, profileData);
-        setDailyWorkout({
+        setDailyWorkouts([{
           id: `daily_${Date.now()}`,
           title: workoutData.title,
           content: workoutData.content,
           duration: 45, // Durée par défaut
           calories: estimatedCalories,
-          completed: false
-        });
+          completed: false,
+          sessionType: 'morning' as const
+        }]);
       }
       
       // Charger les repas quotidiens depuis le profil
@@ -140,10 +406,6 @@ export default function Dashboard() {
       console.error("Erreur lors du chargement des données:", error);
     }
   }, []);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
 
   // Recharger les données à chaque fois que l'utilisateur revient sur cet onglet
   useFocusEffect(
@@ -248,14 +510,11 @@ export default function Dashboard() {
   const handleImportMeal = async (meal: { id: string; title: string; content: string; date: string }) => {
     if (!currentMealType) return;
 
-    // Utiliser les mêmes fonctions d'extraction et de nettoyage que dans le chat
-    const extractedTitle = extractMealTitle(meal.content);
-    const cleanedContent = cleanMealContent(meal.content);
-
+    // Utiliser directement le titre et le contenu déjà formatés
     const success = await saveDailyMeal(currentMealType, {
       id: `${currentMealType}_${Date.now()}`,
-      title: extractedTitle,
-      content: cleanedContent,
+      title: meal.title,
+      content: meal.content,
       date: new Date().toISOString(),
       eaten: false
     });
@@ -271,47 +530,7 @@ export default function Dashboard() {
 
   // Fonction pour recalculer les valeurs nutritionnelles basées sur les repas mangés
   // Fonction pour estimer les calories brûlées lors d'une séance
-  const estimateWorkoutCalories = (workoutContent: string, userProfile: UserProfile | null) => {
-    // Estimation basique : 8-12 calories par minute selon l'intensité
-    const baseCaloriesPerMinute = 10;
-    const duration = 45; // Durée par défaut en minutes
-    
-    // Ajuster selon le niveau de fitness
-    let multiplier = 1;
-    if (userProfile?.fitnessLevel === 'Avancé') multiplier = 1.2;
-    else if (userProfile?.fitnessLevel === 'Débutant') multiplier = 0.8;
-    
-    // Ajuster selon le poids de l'utilisateur
-    if (userProfile?.weight) {
-      multiplier *= (userProfile.weight / 70); // 70kg comme référence
-    }
-    
-    return Math.round(baseCaloriesPerMinute * duration * multiplier);
-  };
 
-  // Fonction pour marquer une séance comme terminée
-  const toggleWorkoutCompleted = async () => {
-    if (!dailyWorkout) return;
-
-    const updatedWorkout = {
-      ...dailyWorkout,
-      completed: !dailyWorkout.completed,
-      completedAt: !dailyWorkout.completed ? new Date().toISOString() : undefined
-    };
-
-    setDailyWorkout(updatedWorkout);
-
-    // Sauvegarder dans le profil
-    if (profile) {
-      const updatedProfile = {
-        ...profile,
-        dailyWorkout: updatedWorkout
-      };
-      await AsyncStorage.setItem('userProfile', JSON.stringify(updatedProfile));
-    }
-
-    console.log(`Séance ${updatedWorkout.completed ? 'terminée' : 'non terminée'}: ${updatedWorkout.title}`);
-  };
 
   const recalculateNutritionFromMeals = (meals: typeof dailyMeals) => {
     let totalCalories = 0;
@@ -374,6 +593,104 @@ export default function Dashboard() {
     const fat = Math.round(baseMacros[mealType].fat * multiplier);
 
     return { calories, carbs, protein, fat };
+  };
+
+  // Fonctions de gestion des séances
+  const toggleWorkoutCompleted = async (workoutId: string) => {
+    const workout = dailyWorkouts.find(w => w.id === workoutId);
+    if (!workout) return;
+
+    const updatedWorkouts = dailyWorkouts.map(w => 
+      w.id === workoutId 
+        ? { 
+            ...w, 
+            completed: !w.completed,
+            completedAt: !w.completed ? new Date().toISOString() : undefined
+          }
+        : w
+    );
+
+    setDailyWorkouts(updatedWorkouts);
+
+    // Sauvegarder dans le profil
+    try {
+      const profileData = await loadProfile();
+      if (profileData) {
+        const updatedProfile = {
+          ...profileData,
+          dailyWorkouts: updatedWorkouts
+        };
+        await AsyncStorage.setItem('userProfile', JSON.stringify(updatedProfile));
+        console.log(`Séance ${workoutId} marquée comme ${!workout.completed ? 'terminée' : 'non terminée'}`);
+      }
+    } catch (error) {
+      console.error('Erreur sauvegarde séance:', error);
+    }
+  };
+
+  const importWorkout = async (workout: { id: string; title: string; content: string; date: string }) => {
+    if (dailyWorkouts.length >= 2) {
+      alert('Maximum 2 séances par jour');
+      return;
+    }
+
+    const sessionType: 'morning' | 'evening' = dailyWorkouts.length === 0 ? 'morning' : 'evening';
+    const estimatedCalories = estimateWorkoutCalories(workout.content, profile);
+    
+    const newWorkout = {
+      id: `daily_${Date.now()}`,
+      title: workout.title,
+      content: workout.content,
+      duration: 45,
+      calories: estimatedCalories,
+      completed: false,
+      sessionType
+    };
+
+    const updatedWorkouts = [...dailyWorkouts, newWorkout];
+    setDailyWorkouts(updatedWorkouts);
+
+    // Sauvegarder dans le profil
+    try {
+      const profileData = await loadProfile();
+      if (profileData) {
+        const updatedProfile = {
+          ...profileData,
+          dailyWorkouts: updatedWorkouts
+        };
+        await AsyncStorage.setItem('userProfile', JSON.stringify(updatedProfile));
+        console.log('Séance importée:', newWorkout.title);
+      }
+    } catch (error) {
+      console.error('Erreur sauvegarde séance importée:', error);
+    }
+
+    setShowImportModal(false);
+  };
+
+  const removeWorkout = async (workoutId: string) => {
+    const updatedWorkouts = dailyWorkouts.filter(w => w.id !== workoutId);
+    setDailyWorkouts(updatedWorkouts);
+
+    // Sauvegarder dans le profil
+    try {
+      const profileData = await loadProfile();
+      if (profileData) {
+        const updatedProfile = {
+          ...profileData,
+          dailyWorkouts: updatedWorkouts
+        };
+        await AsyncStorage.setItem('userProfile', JSON.stringify(updatedProfile));
+        console.log('Séance supprimée:', workoutId);
+      }
+    } catch (error) {
+      console.error('Erreur suppression séance:', error);
+    }
+  };
+
+  const openWorkoutDetail = (workout: typeof dailyWorkouts[0]) => {
+    setSelectedWorkout(workout);
+    setShowWorkoutModal(true);
   };
 
   // Fonction pour basculer l'état "eaten" d'un repas
@@ -523,7 +840,7 @@ export default function Dashboard() {
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <Text style={{ color: "#fff", fontSize: 24, fontWeight: "800" }}>
           Salut Matteo
-        </Text>
+      </Text>
       </View>
 
       {/* Section Nutrition et Pas - 3/4 et 1/4 */}
@@ -541,8 +858,8 @@ export default function Dashboard() {
         >
           <Text style={{ color: "#fff", fontWeight: "800", fontSize: 16, marginBottom: 8 }}>
             NUTRITION DU JOUR
-          </Text>
-          
+      </Text>
+
           {/* Affichage des calories */}
           <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
             <Text style={{ color: "#0070F3", fontWeight: "700", fontSize: 14 }}>
@@ -575,98 +892,79 @@ export default function Dashboard() {
 
 
 
-          {/* Section Macronutriments avec toggle */}
-          <View style={{ marginTop: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <View style={{ flexDirection: "row", flex: 1 }}>
-              {showMacronutrients && (
-                <>
-                  {/* Cercle Glucides */}
-                  <View style={{ alignItems: "center", marginRight: 16 }}>
-                    <View style={{
-                      width: 60,
-                      height: 60,
-                      borderRadius: 30,
-                      borderWidth: 3,
-                      borderColor: "#2a2a2a",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      marginBottom: 4,
-                    }}>
-                      <Text style={{ color: "#ff6b9d", fontSize: 12, fontWeight: "700" }}>
-                        {Math.round(carbsProgress)}%
-                      </Text>
-                    </View>
-                    <Text style={{ color: "#ff6b9d", fontSize: 10, fontWeight: "600", marginBottom: 2 }}>
-                      Glucides
-                    </Text>
-                    <Text style={{ color: "#ff6b9d", fontSize: 9 }}>
-                      {carbsTarget - macronutrients.carbs}g restants
-                    </Text>
-                  </View>
-
-                  {/* Cercle Protéines */}
-                  <View style={{ alignItems: "center", marginRight: 16 }}>
-                    <View style={{
-                      width: 60,
-                      height: 60,
-                      borderRadius: 30,
-                      borderWidth: 3,
-                      borderColor: "#2a2a2a",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      marginBottom: 4,
-                    }}>
-                      <Text style={{ color: "#4dabf7", fontSize: 12, fontWeight: "700" }}>
-                        {Math.round(proteinProgress)}%
-                      </Text>
-                    </View>
-                    <Text style={{ color: "#4dabf7", fontSize: 10, fontWeight: "600", marginBottom: 2 }}>
-                      Protéine
-                    </Text>
-                    <Text style={{ color: "#4dabf7", fontSize: 9 }}>
-                      {proteinTarget - macronutrients.protein}g restants
-                    </Text>
-                  </View>
-
-                  {/* Cercle Graisses */}
-                  <View style={{ alignItems: "center" }}>
-                    <View style={{
-                      width: 60,
-                      height: 60,
-                      borderRadius: 30,
-                      borderWidth: 3,
-                      borderColor: "#2a2a2a",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      marginBottom: 4,
-                    }}>
-                      <Text style={{ color: "#ffa94d", fontSize: 12, fontWeight: "700" }}>
-                        {Math.round(fatProgress)}%
-                      </Text>
-                    </View>
-                    <Text style={{ color: "#ffa94d", fontSize: 10, fontWeight: "600", marginBottom: 2 }}>
-                      Graisse
-                    </Text>
-                    <Text style={{ color: "#ffa94d", fontSize: 9 }}>
-                      {fatTarget - macronutrients.fat}g restants
-                    </Text>
-                  </View>
-                </>
-              )}
-            </View>
-            
-            {/* Flèche toggle */}
-            <Pressable
-              onPress={() => setShowMacronutrients(!showMacronutrients)}
-              style={{
-                padding: 4,
-                marginLeft: 8,
-              }}
-            >
-              <Text style={{ color: "#666", fontSize: 12 }}>
-                {showMacronutrients ? "▲" : "▼"}
+          {/* Section Macronutriments */}
+          <View style={{ marginTop: 16, flexDirection: "row", alignItems: "center" }}>
+            {/* Cercle Glucides */}
+            <View style={{ alignItems: "center", marginRight: 16 }}>
+              <View style={{
+                width: 60,
+                height: 60,
+                borderRadius: 30,
+                borderWidth: 3,
+                borderColor: "#2a2a2a",
+                justifyContent: "center",
+                alignItems: "center",
+                marginBottom: 4,
+              }}>
+                <Text style={{ color: "#ff6b9d", fontSize: 12, fontWeight: "700" }}>
+                  {Math.round(carbsProgress)}%
+                </Text>
+              </View>
+              <Text style={{ color: "#ff6b9d", fontSize: 10, fontWeight: "600", marginBottom: 2 }}>
+                Glucides
               </Text>
-            </Pressable>
+              <Text style={{ color: "#ff6b9d", fontSize: 9 }}>
+                {carbsTarget - macronutrients.carbs}g restants
+              </Text>
+            </View>
+
+            {/* Cercle Protéines */}
+            <View style={{ alignItems: "center", marginRight: 16 }}>
+              <View style={{
+                width: 60,
+                height: 60,
+                borderRadius: 30,
+                borderWidth: 3,
+                borderColor: "#2a2a2a",
+                justifyContent: "center",
+                alignItems: "center",
+                marginBottom: 4,
+              }}>
+                <Text style={{ color: "#4dabf7", fontSize: 12, fontWeight: "700" }}>
+                  {Math.round(proteinProgress)}%
+                </Text>
+              </View>
+              <Text style={{ color: "#4dabf7", fontSize: 10, fontWeight: "600", marginBottom: 2 }}>
+                Protéine
+              </Text>
+              <Text style={{ color: "#4dabf7", fontSize: 9 }}>
+                {proteinTarget - macronutrients.protein}g restants
+              </Text>
+            </View>
+
+            {/* Cercle Graisses */}
+            <View style={{ alignItems: "center" }}>
+              <View style={{
+                width: 60,
+                height: 60,
+                borderRadius: 30,
+                borderWidth: 3,
+                borderColor: "#2a2a2a",
+                justifyContent: "center",
+                alignItems: "center",
+                marginBottom: 4,
+              }}>
+                <Text style={{ color: "#ffa94d", fontSize: 12, fontWeight: "700" }}>
+                  {Math.round(fatProgress)}%
+                </Text>
+              </View>
+              <Text style={{ color: "#ffa94d", fontSize: 10, fontWeight: "600", marginBottom: 2 }}>
+                Graisse
+              </Text>
+              <Text style={{ color: "#ffa94d", fontSize: 9 }}>
+                {fatTarget - macronutrients.fat}g restants
+              </Text>
+            </View>
           </View>
 
 
@@ -711,10 +1009,10 @@ export default function Dashboard() {
                   borderRadius: 50,
                   borderWidth: 8,
                   borderColor: "transparent",
-                  borderTopColor: stepsProgressPercentage >= 100 ? "#FF6B35" : "#00D4AA",
-                  borderRightColor: stepsProgressPercentage >= 75 ? (stepsProgressPercentage >= 100 ? "#FF6B35" : "#00D4AA") : "transparent",
-                  borderBottomColor: stepsProgressPercentage >= 50 ? (stepsProgressPercentage >= 100 ? "#FF6B35" : "#00D4AA") : "transparent",
-                  borderLeftColor: stepsProgressPercentage >= 25 ? (stepsProgressPercentage >= 100 ? "#FF6B35" : "#00D4AA") : "transparent",
+                  borderTopColor: stepsProgressPercentage >= 100 ? "#0070F3" : "#0070F3",
+                  borderRightColor: stepsProgressPercentage >= 75 ? (stepsProgressPercentage >= 100 ? "#0070F3" : "#0070F3") : "transparent",
+                  borderBottomColor: stepsProgressPercentage >= 50 ? (stepsProgressPercentage >= 100 ? "#0070F3" : "#0070F3") : "transparent",
+                  borderLeftColor: stepsProgressPercentage >= 25 ? (stepsProgressPercentage >= 100 ? "#0070F3" : "#0070F3") : "transparent",
                   transform: [{ rotate: "-90deg" }],
                 }}
               />
@@ -729,7 +1027,7 @@ export default function Dashboard() {
           </View>
 
           {/* Affichage des pas */}
-          <Text style={{ color: "#00D4AA", fontWeight: "700", fontSize: 12, textAlign: "center" }}>
+          <Text style={{ color: "#0070F3", fontWeight: "700", fontSize: 12, textAlign: "center" }}>
             {stepsCurrent.toLocaleString()} / 10,000
           </Text>
         </View>
@@ -748,7 +1046,7 @@ export default function Dashboard() {
       >
         <Text style={{ color: "#fff", fontWeight: "800", fontSize: 18, marginBottom: 12 }}>
           REPAS DU JOUR
-      </Text>
+        </Text>
         
         <View style={{ gap: 12 }}>
           {/* Petit-déjeuner */}
@@ -791,7 +1089,7 @@ export default function Dashboard() {
                 textDecorationLine: dailyMeals.breakfast?.eaten ? "line-through" : "none"
               }}>
                 {dailyMeals.breakfast ? dailyMeals.breakfast.title : "Pas encore planifié"}
-              </Text>
+        </Text>
             </Pressable>
           </View>
 
@@ -835,7 +1133,7 @@ export default function Dashboard() {
                 textDecorationLine: dailyMeals.lunch?.eaten ? "line-through" : "none"
               }}>
                 {dailyMeals.lunch ? dailyMeals.lunch.title : "Pas encore planifié"}
-              </Text>
+          </Text>
             </Pressable>
           </View>
 
@@ -863,7 +1161,7 @@ export default function Dashboard() {
               )}
             </Pressable>
             
-            <Pressable 
+          <Pressable
               style={{ flex: 1 }}
               onPress={() => {
                 if (dailyMeals.snack) {
@@ -889,7 +1187,7 @@ export default function Dashboard() {
             <Pressable
               onPress={() => dailyMeals.dinner && toggleMealEaten('dinner')}
               disabled={!dailyMeals.dinner}
-              style={{
+            style={{
                 width: 20,
                 height: 20,
                 borderRadius: 4,
@@ -966,117 +1264,139 @@ export default function Dashboard() {
           SPORT
         </Text>
         
-        {dailyWorkout ? (
-          <View style={{ alignItems: "center" }}>
-            {/* Cercle de progression */}
-            <View style={{ position: "relative", marginBottom: 16 }}>
-              <View
-                style={{
-                  width: 120,
-                  height: 120,
-                  borderRadius: 60,
-                  borderWidth: 8,
-                  borderColor: "#2a2a2a",
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
-                {/* Cercle de progression */}
-                <View
-                  style={{
-                    position: "absolute",
-                    width: 120,
-                    height: 120,
-                    borderRadius: 60,
-                    borderWidth: 8,
-                    borderColor: "transparent",
-                    borderTopColor: dailyWorkout.completed ? "#4CAF50" : "#0070F3",
-                    borderRightColor: dailyWorkout.completed ? "#4CAF50" : "#0070F3",
-                    borderBottomColor: dailyWorkout.completed ? "#4CAF50" : "#0070F3",
-                    borderLeftColor: dailyWorkout.completed ? "#4CAF50" : "#0070F3",
-                    transform: [{ rotate: "-90deg" }],
-                  }}
-                />
-                
-                {/* Icône au centre */}
-                <Text style={{ color: dailyWorkout.completed ? "#4CAF50" : "#0070F3", fontSize: 24 }}>
-                  {dailyWorkout.completed ? "✓" : "🏃"}
-                </Text>
-              </View>
-            </View>
-
-            {/* Informations de la séance */}
-            <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700", marginBottom: 4, textAlign: "center" }}>
-              {dailyWorkout.title}
+        {/* Barre de progression des calories dépensées */}
+        <View style={{ marginBottom: 16 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <Text style={{ color: "#0070F3", fontWeight: "700", fontSize: 14 }}>
+              Calories dépensées
             </Text>
-            <Text style={{ color: "#8a8a8a", fontSize: 14, marginBottom: 8, textAlign: "center" }}>
-              {dailyWorkout.duration} min • {dailyWorkout.calories} kcal
+            <Text style={{ color: "#0070F3", fontWeight: "700", fontSize: 14 }}>
+              {Math.round(calculateDailyCaloriesBurned())} / {Math.round(calculateDailyCalorieGoal())} kcal
             </Text>
-            
-            {/* Statut */}
-            <Text style={{ 
-              color: dailyWorkout.completed ? "#4CAF50" : "#0070F3", 
-              fontSize: 12, 
-              fontWeight: "600",
-              marginBottom: 16
-            }}>
-              {dailyWorkout.completed ? "Terminée" : "À faire"}
-            </Text>
-
-            {/* Boutons d'action */}
-            <View style={{ flexDirection: "row", gap: 12, width: "100%" }}>
-              <Pressable
-                onPress={toggleWorkoutCompleted}
-                style={{
-                  flex: 1,
-                  backgroundColor: dailyWorkout.completed ? "#4CAF50" : "#0070F3",
-                  paddingVertical: 12,
-                  borderRadius: 12,
-                  alignItems: "center",
-                }}
-              >
-                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>
-                  {dailyWorkout.completed ? "Marquer non terminée" : "Marquer terminée"}
-                </Text>
-              </Pressable>
-              
-              <Link href="/sport" asChild>
+          </View>
+          
+          {/* Barre de progression */}
+          <View
+            style={{
+              backgroundColor: "#2a2a2a",
+              height: 6,
+              borderRadius: 3,
+              overflow: "hidden",
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: "#0070F3",
+                height: "100%",
+                width: `${Math.min((calculateDailyCaloriesBurned() / calculateDailyCalorieGoal()) * 100, 100)}%`,
+                borderRadius: 3,
+              }}
+            />
+          </View>
+        </View>
+        
+        {dailyWorkouts.length > 0 ? (
+          <View>
+            {dailyWorkouts.map((workout, index) => (
+              <View key={workout.id} style={{ marginBottom: 12 }}>
                 <Pressable
+                  onPress={() => openWorkoutDetail(workout)}
                   style={{
-                    flex: 1,
-                    backgroundColor: "#333",
-                    paddingVertical: 12,
-                    borderRadius: 12,
-                    alignItems: "center",
+                    backgroundColor: "#1a1a1a",
+                    borderColor: workout.completed ? "#22c55e" : "#333",
                     borderWidth: 1,
-                    borderColor: "#555",
+                    borderRadius: 12,
+                    padding: 12,
                   }}
                 >
-                  <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>
-                    Détails
-                  </Text>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ 
+                        color: workout.completed ? "#22c55e" : "#fff", 
+                        fontWeight: "600", 
+                        fontSize: 14,
+                        textDecorationLine: workout.completed ? "line-through" : "none"
+                      }}>
+                        {workout.title}
+        </Text>
+                      <Text style={{ color: "#888", fontSize: 12, marginTop: 2 }}>
+                        {workout.duration} min • {workout.calories} kcal • {workout.sessionType === 'morning' ? 'Matin' : 'Soir'}
+          </Text>
+                    </View>
+                    
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <Pressable
+                        onPress={() => toggleWorkoutCompleted(workout.id)}
+                        style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: 12,
+                          borderWidth: 2,
+                          borderColor: workout.completed ? "#22c55e" : "#555",
+                          backgroundColor: workout.completed ? "#22c55e" : "transparent",
+                          justifyContent: "center",
+                          alignItems: "center",
+                        }}
+                      >
+                        {workout.completed && (
+                          <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>✓</Text>
+                        )}
+                      </Pressable>
+                      
+          <Pressable
+                        onPress={() => removeWorkout(workout.id)}
+            style={{
+                          width: 24,
+                          height: 24,
+              borderRadius: 12,
+                          backgroundColor: "#ff4444",
+                          justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+                        <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>×</Text>
+          </Pressable>
+      </View>
+                  </View>
                 </Pressable>
-              </Link>
-            </View>
+              </View>
+            ))}
+
+            {dailyWorkouts.length < 2 && (
+          <Pressable
+                onPress={() => setShowImportModal(true)}
+            style={{
+                  backgroundColor: "#0070F3",
+                  paddingVertical: 12,
+                  paddingHorizontal: 16,
+              borderRadius: 12,
+              alignItems: "center",
+                  marginTop: 8,
+            }}
+          >
+                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>
+                  Importer une séance enregistrée
+            </Text>
+              </Pressable>
+            )}
           </View>
         ) : (
           <View style={{ alignItems: "center", paddingVertical: 20 }}>
-            <Text style={{ color: "#8a8a8a", fontSize: 16, marginBottom: 12, textAlign: "center" }}>
+            <Text style={{ color: "#888", fontSize: 16, marginBottom: 16 }}>
               Aucune séance planifiée
             </Text>
-            <Link href="/sport" asChild>
-              <Pressable
-                style={{
-                  backgroundColor: "#0070F3",
-                  paddingVertical: 12,
-                  paddingHorizontal: 24,
-                  borderRadius: 12,
-                  alignItems: "center",
-                }}
-              >
-                <Text style={{ color: "#fff", fontWeight: "700" }}>Planifier une séance</Text>
-              </Pressable>
-            </Link>
+            <Pressable
+              onPress={() => setShowImportModal(true)}
+              style={{
+                backgroundColor: "#0070F3",
+                paddingVertical: 12,
+                paddingHorizontal: 24,
+                borderRadius: 12,
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ color: "#fff", fontWeight: "700" }}>Importer une séance enregistrée</Text>
+          </Pressable>
           </View>
         )}
       </View>
@@ -1085,8 +1405,8 @@ export default function Dashboard() {
       {/* LISTE DE COURSES */}
       <View
         style={{
-          backgroundColor: "#1a0e1a",
-          borderColor: "#2a1a2a",
+          backgroundColor: "#111",
+          borderColor: "#1d1d1d",
           borderWidth: 1,
           borderRadius: 16,
           padding: 16,
@@ -1147,12 +1467,12 @@ export default function Dashboard() {
               <Text style={{ color: "#fff", fontSize: 18, fontWeight: "800", flex: 1 }}>
                 {selectedMeal?.title}
             </Text>
-              <Pressable
+          <Pressable
                 onPress={() => {
                   setShowMealModal(false);
                   setSelectedMeal(null);
                 }}
-                style={{
+            style={{
                   backgroundColor: "#333",
                   paddingHorizontal: 12,
                   paddingVertical: 6,
@@ -1268,17 +1588,17 @@ export default function Dashboard() {
             />
             
             <View style={{ flexDirection: "row", gap: 12 }}>
-              <Pressable
+          <Pressable
                 onPress={() => {
                   setShowAddMealModal(false);
                   setShowImportMealModal(true);
                 }}
-                style={{
+            style={{
                   flex: 1,
                   backgroundColor: "#333",
-                  paddingVertical: 12,
+              paddingVertical: 12,
                   borderRadius: 8,
-                  alignItems: "center",
+              alignItems: "center",
                 }}
               >
                 <Text style={{ color: "#fff", fontWeight: "600" }}>Importer</Text>
@@ -1371,10 +1691,10 @@ export default function Dashboard() {
                     }}
                   >
                     <Text style={{ color: "#fff", fontWeight: "600", marginBottom: 4 }}>
-                      {extractMealTitle(meal.content)}
+                      {meal.title}
                     </Text>
                     <Text style={{ color: "#aaa", fontSize: 12 }} numberOfLines={2}>
-                      {cleanMealContent(meal.content)}
+                      {meal.content}
                     </Text>
           </Pressable>
                 ))
@@ -1399,7 +1719,7 @@ export default function Dashboard() {
           flex: 1,
           backgroundColor: "rgba(0, 0, 0, 0.8)",
           justifyContent: "center",
-          alignItems: "center",
+              alignItems: "center",
           padding: 20,
         }}>
           <View style={{
@@ -1408,7 +1728,7 @@ export default function Dashboard() {
             padding: 24,
             width: "100%",
             maxWidth: 300,
-            borderWidth: 1,
+              borderWidth: 1,
             borderColor: "#333",
           }}>
             <Text style={{ color: "#fff", fontSize: 18, fontWeight: "800", marginBottom: 20, textAlign: "center" }}>
@@ -1429,7 +1749,7 @@ export default function Dashboard() {
                 <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600", textAlign: "center" }}>
                   Petit-déjeuner
                 </Text>
-              </Pressable>
+          </Pressable>
 
               <Pressable
                 onPress={() => handleMealTypeSelect('lunch')}
@@ -1475,7 +1795,7 @@ export default function Dashboard() {
                   Dîner
                 </Text>
               </Pressable>
-            </View>
+      </View>
 
             <Pressable
               onPress={() => setShowMealTypeSelector(false)}
@@ -1489,6 +1809,191 @@ export default function Dashboard() {
             >
               <Text style={{ color: "#fff", fontWeight: "600" }}>Annuler</Text>
             </Pressable>
+    </View>
+        </View>
+      </Modal>
+
+      {/* Modal de détail des séances */}
+      <Modal
+        visible={showWorkoutModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setShowWorkoutModal(false);
+          setSelectedWorkout(null);
+        }}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0, 0, 0, 0.8)",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "#1a1a1a",
+              borderRadius: 16,
+              padding: 20,
+              width: "100%",
+              maxHeight: "80%",
+            }}
+          >
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700" }}>
+                {selectedWorkout?.title}
+              </Text>
+              <Pressable
+                onPress={() => {
+                  setShowWorkoutModal(false);
+                  setSelectedWorkout(null);
+                }}
+                style={{
+                  backgroundColor: "#333",
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 8,
+                }}
+              >
+                <Text style={{ color: "#fff", fontWeight: "600" }}>Fermer</Text>
+              </Pressable>
+            </View>
+
+            {selectedWorkout && (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {/* Matériel */}
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={{ color: "#0070F3", fontSize: 16, fontWeight: "600", marginBottom: 8 }}>
+                    Matériel
+                  </Text>
+                  <Text style={{ color: "#fff", fontSize: 14 }}>
+                    {extractWorkoutEquipment(selectedWorkout.content)}
+                  </Text>
+                </View>
+
+                {/* Sections de la séance */}
+                {(() => {
+                  const sections = extractWorkoutSections(selectedWorkout.content);
+                  return (
+                    <>
+                      {sections.warmup.length > 0 && (
+                        <View style={{ marginBottom: 16 }}>
+                          <Text style={{ color: "#0070F3", fontSize: 16, fontWeight: "600", marginBottom: 8 }}>
+                            Échauffement
+                          </Text>
+                          {sections.warmup.map((line, index) => (
+                            <Text key={index} style={{ color: "#fff", fontSize: 14, marginBottom: 4 }}>
+                              • {line}
+                            </Text>
+                          ))}
+                        </View>
+                      )}
+
+                      {sections.main.length > 0 && (
+                        <View style={{ marginBottom: 16 }}>
+                          <Text style={{ color: "#0070F3", fontSize: 16, fontWeight: "600", marginBottom: 8 }}>
+                            Circuit principal
+                          </Text>
+                          {sections.main.map((line, index) => (
+                            <Text key={index} style={{ color: "#fff", fontSize: 14, marginBottom: 4 }}>
+                              • {line}
+                            </Text>
+                          ))}
+                        </View>
+                      )}
+
+                      {sections.cooldown.length > 0 && (
+                        <View style={{ marginBottom: 16 }}>
+                          <Text style={{ color: "#0070F3", fontSize: 16, fontWeight: "600", marginBottom: 8 }}>
+                            Récupération
+                          </Text>
+                          {sections.cooldown.map((line, index) => (
+                            <Text key={index} style={{ color: "#fff", fontSize: 14, marginBottom: 4 }}>
+                              • {line}
+                            </Text>
+                          ))}
+                        </View>
+                      )}
+                    </>
+                  );
+                })()}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal d'import de séances */}
+      <Modal
+        visible={showImportModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowImportModal(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0, 0, 0, 0.8)",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "#1a1a1a",
+              borderRadius: 16,
+              padding: 20,
+              width: "100%",
+              maxHeight: "80%",
+            }}
+          >
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700" }}>
+                Importer une séance
+              </Text>
+              <Pressable
+                onPress={() => setShowImportModal(false)}
+                style={{
+                  backgroundColor: "#333",
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 8,
+                }}
+              >
+                <Text style={{ color: "#fff", fontWeight: "600" }}>Fermer</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {savedWorkouts.length > 0 ? (
+                savedWorkouts.map((workout) => (
+                  <Pressable
+                    key={workout.id}
+                    onPress={() => importWorkout(workout)}
+                    style={{
+                      backgroundColor: "#333",
+                      padding: 12,
+                      borderRadius: 8,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600" }}>
+                      {workout.title}
+                    </Text>
+                    <Text style={{ color: "#888", fontSize: 12, marginTop: 4 }}>
+                      {new Date(workout.date).toLocaleDateString()}
+                    </Text>
+                  </Pressable>
+                ))
+              ) : (
+                <Text style={{ color: "#888", fontSize: 14, textAlign: "center", paddingVertical: 20 }}>
+                  Aucune séance sauvegardée
+                </Text>
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
