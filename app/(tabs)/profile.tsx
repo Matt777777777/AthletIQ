@@ -458,15 +458,68 @@ export default function Profile() {
           <Pressable
             onPress={() => isEditing ? handleSaveProfile() : setIsEditing(true)}
             style={{
-              backgroundColor: isEditing ? "#00D4AA" : "#0070F3",
-              paddingHorizontal: 12,
-              paddingVertical: 6,
-              borderRadius: 8,
+              backgroundColor: "transparent",
+              paddingHorizontal: 8,
+              paddingVertical: 8,
+              alignItems: "center",
+              justifyContent: "center",
+              minWidth: 32,
+              minHeight: 32,
             }}
           >
-            <Text style={{ color: "#fff", fontWeight: "600", fontSize: 12 }}>
-              {isEditing ? "Sauvegarder" : "Modifier"}
-            </Text>
+            {isEditing ? (
+              <Text style={{ color: "#00D4AA", fontWeight: "600", fontSize: 16 }}>
+                ✓
+              </Text>
+            ) : (
+              <View style={{ alignItems: "center", justifyContent: "center" }}>
+                {/* Icône carré + stylo en bleu */}
+                <View style={{
+                  width: 24,
+                  height: 24,
+                  position: "relative",
+                }}>
+                  {/* Carré avec bordure */}
+                  <View style={{
+                    position: "absolute",
+                    top: 3,
+                    left: 3,
+                    width: 15,
+                    height: 15,
+                    backgroundColor: "transparent",
+                    borderWidth: 2,
+                    borderColor: "#0070F3",
+                    borderRadius: 2,
+                  }} />
+                  {/* Stylo en diagonale */}
+                  <View style={{
+                    position: "absolute",
+                    top: 2,
+                    left: 12,
+                    width: 12,
+                    height: 3,
+                    backgroundColor: "#0070F3",
+                    borderRadius: 1.5,
+                    transform: [{ rotate: "-45deg" }],
+                  }} />
+                  {/* Pointe du stylo */}
+                  <View style={{
+                    position: "absolute",
+                    top: 9,
+                    left: 6,
+                    width: 0,
+                    height: 0,
+                    borderLeftWidth: 2,
+                    borderRightWidth: 2,
+                    borderTopWidth: 4,
+                    borderLeftColor: "transparent",
+                    borderRightColor: "transparent",
+                    borderTopColor: "#0070F3",
+                    transform: [{ rotate: "-45deg" }],
+                  }} />
+                </View>
+              </View>
+            )}
           </Pressable>
         </View>
 
@@ -605,15 +658,68 @@ export default function Profile() {
                 setIsEditingPreferences(!isEditingPreferences);
               }}
               style={{
-                backgroundColor: isEditingPreferences ? "#00D4AA" : "#0070F3",
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-                borderRadius: 8,
+                backgroundColor: "transparent",
+                paddingHorizontal: 8,
+                paddingVertical: 8,
+                alignItems: "center",
+                justifyContent: "center",
+                minWidth: 32,
+                minHeight: 32,
               }}
             >
-              <Text style={{ color: "#fff", fontWeight: "600", fontSize: 12 }}>
-                {isEditingPreferences ? "Annuler" : "Modifier"}
-              </Text>
+              {isEditingPreferences ? (
+                <Text style={{ color: "#ef4444", fontWeight: "600", fontSize: 16 }}>
+                  ✕
+                </Text>
+              ) : (
+                <View style={{ alignItems: "center", justifyContent: "center" }}>
+                  {/* Icône carré + stylo en bleu */}
+                  <View style={{
+                    width: 24,
+                    height: 24,
+                    position: "relative",
+                  }}>
+                    {/* Carré avec bordure */}
+                    <View style={{
+                      position: "absolute",
+                      top: 3,
+                      left: 3,
+                      width: 15,
+                      height: 15,
+                      backgroundColor: "transparent",
+                      borderWidth: 2,
+                      borderColor: "#0070F3",
+                      borderRadius: 2,
+                    }} />
+                    {/* Stylo en diagonale */}
+                    <View style={{
+                      position: "absolute",
+                      top: 2,
+                      left: 12,
+                      width: 12,
+                      height: 3,
+                      backgroundColor: "#0070F3",
+                      borderRadius: 1.5,
+                      transform: [{ rotate: "-45deg" }],
+                    }} />
+                    {/* Pointe du stylo */}
+                    <View style={{
+                      position: "absolute",
+                      top: 9,
+                      left: 6,
+                      width: 0,
+                      height: 0,
+                      borderLeftWidth: 2,
+                      borderRightWidth: 2,
+                      borderTopWidth: 4,
+                      borderLeftColor: "transparent",
+                      borderRightColor: "transparent",
+                      borderTopColor: "#0070F3",
+                      transform: [{ rotate: "-45deg" }],
+                    }} />
+                  </View>
+                </View>
+              )}
             </Pressable>
           </View>
         </View>
@@ -971,12 +1077,12 @@ export default function Profile() {
           marginBottom: 20
         }}>
           <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700", marginBottom: 16 }}>
-            📋 Mes plans enregistrés
+            Mes plans enregistrés
           </Text>
           
           {/* Séances sauvegardées */}
           <View style={{ marginBottom: 16 }}>
-            <Text style={{ color: "#6bff6b", fontSize: 16, fontWeight: "600", marginBottom: 8 }}>
+            <Text style={{ color: "#60A5FA", fontSize: 16, fontWeight: "600", marginBottom: 8 }}>
               Séances ({profile?.savedPlans?.workouts?.length || 0})
             </Text>
             {profile?.savedPlans?.workouts?.length ? (
@@ -988,12 +1094,12 @@ export default function Profile() {
                     key={workout.id}
                     onPress={() => openPlanDetail('workout', workout)}
                     style={{ 
-                      backgroundColor: "#1a2a1a", 
+                      backgroundColor: "#1a1f2e", 
                       padding: 12, 
                       borderRadius: 8, 
                       marginBottom: 8,
                       borderLeftWidth: 3,
-                      borderLeftColor: "#6bff6b"
+                      borderLeftColor: "#60A5FA"
                     }}
                   >
                     <Text style={{ color: "#fff", fontWeight: "600", fontSize: 14 }}>
@@ -1011,7 +1117,7 @@ export default function Profile() {
                       {cleanedContent.substring(0, 100)}...
                     </Text>
                     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
-                      <Text style={{ color: "#6bff6b", fontSize: 10, fontWeight: "600" }}>
+                      <Text style={{ color: "#60A5FA", fontSize: 10, fontWeight: "600" }}>
                         Appuyer pour voir le détail
                       </Text>
                       <Pressable
@@ -1052,15 +1158,15 @@ export default function Profile() {
                           );
                         }}
                         style={{
-                          backgroundColor: "#4a1a1a",
+                          backgroundColor: "#1a2a4a",
                           paddingHorizontal: 6,
                           paddingVertical: 4,
                           borderRadius: 4,
                           borderWidth: 1,
-                          borderColor: "#6a2a2a"
+                          borderColor: "#60A5FA"
                         }}
                       >
-                        <Text style={{ color: "#ff6b6b", fontSize: 10, fontWeight: "600" }}>🗑</Text>
+                        <Text style={{ color: "#60A5FA", fontSize: 10, fontWeight: "600" }}>🗑</Text>
                       </Pressable>
                     </View>
                   </Pressable>
@@ -1085,7 +1191,7 @@ export default function Profile() {
           
           {/* Repas sauvegardés */}
           <View>
-            <Text style={{ color: "#6b6bff", fontSize: 16, fontWeight: "600", marginBottom: 8 }}>
+            <Text style={{ color: "#3B82F6", fontSize: 16, fontWeight: "600", marginBottom: 8 }}>
               Repas ({profile?.savedPlans?.meals?.length || 0})
             </Text>
             {profile?.savedPlans?.meals?.length ? (
@@ -1103,12 +1209,12 @@ export default function Profile() {
                       content: cleanedContent
                     })}
                     style={{ 
-                      backgroundColor: "#1a1a2a", 
+                      backgroundColor: "#1a1f3a", 
                       padding: 12, 
                       borderRadius: 8, 
                       marginBottom: 8,
                       borderLeftWidth: 3,
-                      borderLeftColor: "#6b6bff"
+                      borderLeftColor: "#3B82F6"
                     }}
                   >
                     <Text style={{ color: "#fff", fontWeight: "600", fontSize: 14 }}>
@@ -1126,7 +1232,7 @@ export default function Profile() {
                       {cleanedContent.substring(0, 100)}...
                     </Text>
                     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
-                      <Text style={{ color: "#6b6bff", fontSize: 10, fontWeight: "600" }}>
+                      <Text style={{ color: "#3B82F6", fontSize: 10, fontWeight: "600" }}>
                         Appuyer pour voir le détail
                       </Text>
                       <Pressable
@@ -1167,15 +1273,15 @@ export default function Profile() {
                           );
                         }}
                         style={{
-                          backgroundColor: "#1a1a4a",
+                          backgroundColor: "#1a1f3a",
                           paddingHorizontal: 6,
                           paddingVertical: 4,
                           borderRadius: 4,
                           borderWidth: 1,
-                          borderColor: "#2a2a6a"
+                          borderColor: "#3B82F6"
                         }}
                       >
-                        <Text style={{ color: "#ff6b6b", fontSize: 10, fontWeight: "600" }}>🗑</Text>
+                        <Text style={{ color: "#3B82F6", fontSize: 10, fontWeight: "600" }}>🗑</Text>
                       </Pressable>
                     </View>
                   </Pressable>
@@ -1231,15 +1337,15 @@ export default function Profile() {
             }
           }}
           style={{
-            backgroundColor: "#1a2a1a",
+            backgroundColor: "#1a1f2e",
             paddingVertical: 12,
             borderRadius: 12,
             alignItems: "center",
             borderWidth: 1,
-            borderColor: "#2a4a2a",
+            borderColor: "#2a3a4a",
           }}
         >
-          <Text style={{ color: "#6bff6b", fontWeight: "700" }}>Réinitialiser les questions du chat (test)</Text>
+          <Text style={{ color: "#60A5FA", fontWeight: "700" }}>Réinitialiser les questions du chat (test)</Text>
         </Pressable>
       </View>
 
@@ -1281,11 +1387,11 @@ export default function Profile() {
           {/* Contenu du plan */}
           <ScrollView style={{ flex: 1, padding: 20 }}>
             <View style={{
-              backgroundColor: selectedPlan?.type === 'workout' ? "#1a2a1a" : "#1a1a2a",
+              backgroundColor: selectedPlan?.type === 'workout' ? "#1a1f2e" : "#1a1f3a",
               padding: 20,
               borderRadius: 12,
               borderLeftWidth: 4,
-              borderLeftColor: selectedPlan?.type === 'workout' ? "#6bff6b" : "#6b6bff"
+              borderLeftColor: selectedPlan?.type === 'workout' ? "#60A5FA" : "#3B82F6"
             }}>
               <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>
                 Sauvegardé le {selectedPlan?.date ? new Date(selectedPlan.date).toLocaleDateString('fr-FR', {

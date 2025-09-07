@@ -11,6 +11,7 @@ export type UserProfile = {
   age?: number;          // Âge en années
   weight?: number;       // Poids en kg
   height?: number;       // Taille en cm
+  gender?: 'male' | 'female'; // Sexe de l'utilisateur
   profilePhoto?: string; // URI de la photo de profil
   
   // Questions complémentaires du chat IA (réponses exactes)
@@ -102,6 +103,35 @@ export type UserProfile = {
     completedAt?: string;
     sessionType: 'morning' | 'evening'; // Type de séance
   }>;
+
+  // Historique des journées
+  dailyHistory?: {
+    [date: string]: { // Format: "YYYY-MM-DD"
+      date: string;
+      nutrition: {
+        kcal: number;
+        carbs: number;
+        protein: number;
+        fat: number;
+      };
+      steps: {
+        count: number;
+        target: number;
+      };
+      workouts: {
+        completed: number;
+        total: number;
+        caloriesBurned: number;
+        target: number;
+      };
+      meals: {
+        breakfast?: { title: string; eaten: boolean };
+        lunch?: { title: string; eaten: boolean };
+        snack?: { title: string; eaten: boolean };
+        dinner?: { title: string; eaten: boolean };
+      };
+    };
+  };
 };
 
 const KEY = "the_sport_profile_v1";
@@ -265,5 +295,78 @@ export async function deleteDailyMeal(mealType: 'breakfast' | 'lunch' | 'snack' 
   } catch (e) {
     console.error("Erreur en supprimant le repas quotidien:", e);
     return false;
+  }
+}
+
+// Sauvegarder les données du jour dans l'historique
+export async function saveDailyHistory(dayData: {
+  date: string;
+  nutrition: { kcal: number; carbs: number; protein: number; fat: number };
+  steps: { count: number; target: number };
+  workouts: { completed: number; total: number; caloriesBurned: number; target: number };
+  meals: {
+    breakfast?: { title: string; eaten: boolean };
+    lunch?: { title: string; eaten: boolean };
+    snack?: { title: string; eaten: boolean };
+    dinner?: { title: string; eaten: boolean };
+  };
+}): Promise<boolean> {
+  try {
+    const profile = await loadProfile();
+    if (!profile) return false;
+
+    // Initialiser dailyHistory si nécessaire
+    if (!profile.dailyHistory) {
+      profile.dailyHistory = {};
+    }
+
+    // Sauvegarder les données du jour
+    profile.dailyHistory[dayData.date] = dayData;
+    
+    await saveProfile(profile);
+    console.log(`✅ Daily history saved for ${dayData.date}`);
+    return true;
+  } catch (e) {
+    console.error("Erreur en sauvegardant l'historique quotidien:", e);
+    return false;
+  }
+}
+
+// Charger l'historique d'une date spécifique
+export async function loadDailyHistory(date: string): Promise<NonNullable<UserProfile['dailyHistory']>[string] | null> {
+  try {
+    const profile = await loadProfile();
+    if (!profile || !profile.dailyHistory) return null;
+    
+    return profile.dailyHistory[date] || null;
+  } catch (e) {
+    console.error("Erreur en chargeant l'historique quotidien:", e);
+    return null;
+  }
+}
+
+// Charger l'historique des 30 derniers jours
+export async function loadRecentHistory(days: number = 30): Promise<Array<NonNullable<UserProfile['dailyHistory']>[string]>> {
+  try {
+    const profile = await loadProfile();
+    if (!profile || !profile.dailyHistory) return [];
+
+    const today = new Date();
+    const history: Array<NonNullable<UserProfile['dailyHistory']>[string]> = [];
+
+    for (let i = 0; i < days; i++) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateString = date.toISOString().split('T')[0];
+      
+      if (profile.dailyHistory[dateString]) {
+        history.push(profile.dailyHistory[dateString]);
+      }
+    }
+
+    return history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  } catch (e) {
+    console.error("Erreur en chargeant l'historique récent:", e);
+    return [];
   }
 }

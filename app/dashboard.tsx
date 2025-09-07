@@ -3,9 +3,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Link, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import Calendar from "../components/Calendar";
+import DayDetailModal from "../components/DayDetailModal";
 import { DailyIntake, estimateKcalTarget, loadDailyIntake, saveDailyIntake } from "../lib/nutrition";
 import { latestByType, SavedPlan } from "../lib/plans";
-import { loadProfile, saveDailyMeal, UserProfile } from "../lib/profile";
+import { loadDailyHistory, loadProfile, saveDailyHistory, saveDailyMeal, UserProfile } from "../lib/profile";
 import { checkAndResetIfNewDay, checkHealthPermissions, DailySteps, getDailyStepsTarget, getStepsFromSensor, saveDailySteps } from "../lib/steps";
 
 
@@ -82,6 +84,12 @@ export default function Dashboard() {
   const [manualMealTitle, setManualMealTitle] = useState('');
   const [manualMealContent, setManualMealContent] = useState('');
   const [savedMeals, setSavedMeals] = useState<Array<{ id: string; title: string; content: string; date: string }>>([]);
+
+  // États pour le calendrier et l'historique
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [showDayDetail, setShowDayDetail] = useState(false);
+  const [selectedDayData, setSelectedDayData] = useState<NonNullable<UserProfile['dailyHistory']>[string] | null>(null);
 
   // Fonction pour extraire le titre d'une séance
   const extractWorkoutTitle = (content: string): string => {
@@ -297,6 +305,23 @@ export default function Dashboard() {
   useEffect(() => {
     setCircleKey(prev => prev + 1);
   }, [dailyIntake.kcal, dailySteps.steps, workoutStates, profile?.goal]);
+
+  // Sauvegarder automatiquement les données dans l'historique
+  useEffect(() => {
+    const saveInterval = setInterval(() => {
+      saveCurrentDayToHistory();
+    }, 30000); // Sauvegarder toutes les 30 secondes
+
+    return () => clearInterval(saveInterval);
+  }, [profile, dailyIntake, macronutrients, dailySteps, dailyWorkouts, dailyMeals]);
+
+  // Réinitialiser les états du calendrier quand il se ferme
+  useEffect(() => {
+    if (!showCalendar) {
+      setShowDayDetail(false);
+      setSelectedDayData(null);
+    }
+  }, [showCalendar]);
 
   const loadData = useCallback(async () => {
     try {
@@ -828,6 +853,66 @@ export default function Dashboard() {
     }
   };
 
+  // Fonction pour sauvegarder les données du jour dans l'historique
+  const saveCurrentDayToHistory = async () => {
+    if (!profile) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    const dayData = {
+      date: today,
+      nutrition: {
+        kcal: dailyIntake.kcal,
+        carbs: macronutrients.carbs,
+        protein: macronutrients.protein,
+        fat: macronutrients.fat,
+      },
+      steps: {
+        count: dailySteps.steps,
+        target: getDailyStepsTarget(),
+      },
+      workouts: {
+        completed: dailyWorkouts.filter(w => w.completed).length,
+        total: dailyWorkouts.length,
+        caloriesBurned: calculateDailyCaloriesBurned(),
+        target: calculateDailyCalorieGoal(),
+      },
+      meals: {
+        breakfast: dailyMeals.breakfast ? { 
+          title: dailyMeals.breakfast.title, 
+          eaten: dailyMeals.breakfast.eaten || false 
+        } : undefined,
+        lunch: dailyMeals.lunch ? { 
+          title: dailyMeals.lunch.title, 
+          eaten: dailyMeals.lunch.eaten || false 
+        } : undefined,
+        snack: dailyMeals.snack ? { 
+          title: dailyMeals.snack.title, 
+          eaten: dailyMeals.snack.eaten || false 
+        } : undefined,
+        dinner: dailyMeals.dinner ? { 
+          title: dailyMeals.dinner.title, 
+          eaten: dailyMeals.dinner.eaten || false 
+        } : undefined,
+      },
+    };
+
+    await saveDailyHistory(dayData);
+  };
+
+  // Fonction pour charger les données d'une journée sélectionnée
+  const handleDateSelect = async (date: string) => {
+    setSelectedDate(date);
+    const dayData = await loadDailyHistory(date);
+    setSelectedDayData(dayData);
+    setShowDayDetail(true);
+  };
+
+  // Fonction pour fermer le calendrier
+  const handleCloseCalendar = () => {
+    setShowCalendar(false);
+    setShowDayDetail(false);
+  };
+
 
 
 
@@ -840,7 +925,73 @@ export default function Dashboard() {
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <Text style={{ color: "#fff", fontSize: 24, fontWeight: "800" }}>
           Salut Matteo
-      </Text>
+        </Text>
+        <Pressable
+          onPress={() => setShowCalendar(true)}
+          style={{
+            backgroundColor: "#0070F3",
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderRadius: 8,
+            alignItems: "center",
+            justifyContent: "center",
+            minWidth: 40,
+            minHeight: 40,
+          }}
+        >
+          <View style={{ alignItems: "center", justifyContent: "center" }}>
+            {/* Icône de calendrier stylisée */}
+            <View style={{
+              width: 20,
+              height: 18,
+              backgroundColor: "transparent",
+              borderWidth: 1.5,
+              borderColor: "#fff",
+              borderRadius: 2,
+              position: "relative",
+            }}>
+              {/* Anneaux de suspension */}
+              <View style={{
+                position: "absolute",
+                top: -4,
+                left: 3,
+                width: 3,
+                height: 3,
+                borderRadius: 1.5,
+                backgroundColor: "#fff",
+              }} />
+              <View style={{
+                position: "absolute",
+                top: -4,
+                right: 3,
+                width: 3,
+                height: 3,
+                borderRadius: 1.5,
+                backgroundColor: "#fff",
+              }} />
+              
+              {/* Grille des jours */}
+              <View style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                padding: 2,
+                gap: 1,
+              }}>
+                {Array.from({ length: 6 }, (_, i) => (
+                  <View
+                    key={i}
+                    style={{
+                      width: 2,
+                      height: 2,
+                      backgroundColor: "#fff",
+                      borderRadius: 0.5,
+                    }}
+                  />
+                ))}
+              </View>
+            </View>
+          </View>
+        </Pressable>
       </View>
 
       {/* Section Nutrition et Pas - 3/4 et 1/4 */}
@@ -1997,6 +2148,68 @@ export default function Dashboard() {
           </View>
         </View>
       </Modal>
+
+      {/* Modal du calendrier */}
+      <Modal
+        visible={showCalendar}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleCloseCalendar}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0, 0, 0, 0.8)",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "#111",
+              borderRadius: 16,
+              padding: 20,
+              width: "100%",
+              maxHeight: "90%",
+              borderWidth: 1,
+              borderColor: "#1d1d1d",
+            }}
+          >
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "800", flex: 1 }}>
+                Historique des journées
+              </Text>
+              <Pressable
+                onPress={handleCloseCalendar}
+                style={{
+                  backgroundColor: "#333",
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 6,
+                }}
+              >
+                <Text style={{ color: "#fff", fontWeight: "600" }}>✕</Text>
+              </Pressable>
+            </View>
+
+            <Calendar
+              selectedDate={selectedDate}
+              onDateSelect={handleDateSelect}
+              dailyHistory={profile?.dailyHistory}
+              onDayPress={handleDateSelect}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal des détails de journée */}
+      <DayDetailModal
+        visible={showDayDetail}
+        onClose={() => setShowDayDetail(false)}
+        dayData={selectedDayData}
+        date={selectedDate}
+      />
 
     </ScrollView>
   );
