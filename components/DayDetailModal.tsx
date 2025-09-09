@@ -6,37 +6,29 @@ import { UserProfile } from '../lib/profile';
 interface DayDetailModalProps {
   visible: boolean;
   onClose: () => void;
-  dayData: UserProfile['dailyHistory'][string] | null;
+  dayData: NonNullable<UserProfile['dailyHistory']>[string] | null;
   date: string;
 }
 
 export default function DayDetailModal({ visible, onClose, dayData, date }: DayDetailModalProps) {
-  if (!dayData) {
-    return (
-      <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-        <View style={styles.overlay}>
-          <View style={styles.container}>
-            <View style={styles.header}>
-              <Text style={styles.title}>
-                {new Date(date).toLocaleDateString('fr-FR', { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
-                })}
-              </Text>
-              <Pressable onPress={onClose} style={styles.closeButton}>
-                <Text style={styles.closeButtonText}>✕</Text>
-              </Pressable>
-            </View>
-            <View style={styles.noDataContainer}>
-              <Text style={styles.noDataText}>Aucune donnée disponible pour cette journée</Text>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    );
-  }
+  console.log('🔍 DayDetailModal - visible:', visible, 'date:', date, 'dayData:', dayData);
+  console.log('🔍 DayDetailModal - visible type:', typeof visible);
+  console.log('🔍 DayDetailModal - dayData type:', typeof dayData);
+  
+  // Données par défaut si pas de données
+  const defaultData = {
+    nutrition: { kcal: 0, carbs: 0, protein: 0, fat: 0 },
+    steps: { count: 0, target: 10000 },
+    workouts: { completed: 0, total: 0, caloriesBurned: 0, target: 500 },
+    meals: {
+      breakfast: undefined,
+      lunch: undefined,
+      snack: undefined,
+      dinner: undefined
+    }
+  };
+  
+  const displayData = dayData || defaultData;
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('fr-FR', { 
@@ -52,10 +44,10 @@ export default function DayDetailModal({ visible, onClose, dayData, date }: DayD
   };
 
   const getProgressColor = (percentage: number) => {
-    if (percentage >= 80) return '#22c55e';
-    if (percentage >= 60) return '#84cc16';
-    if (percentage >= 40) return '#eab308';
-    return '#ef4444';
+    if (percentage >= 80) return '#0070F3';
+    if (percentage >= 60) return '#3B82F6';
+    if (percentage >= 40) return '#60A5FA';
+    return '#93C5FD';
   };
 
   return (
@@ -72,13 +64,13 @@ export default function DayDetailModal({ visible, onClose, dayData, date }: DayD
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
             {/* Section Nutrition */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>🍎 Nutrition</Text>
+              <Text style={styles.sectionTitle}>Nutrition</Text>
               
               <View style={styles.progressContainer}>
                 <View style={styles.progressHeader}>
                   <Text style={styles.progressLabel}>Calories</Text>
                   <Text style={styles.progressValue}>
-                    {dayData.nutrition.kcal} / 2000 kcal
+                    {displayData.nutrition.kcal} / 2000 kcal
                   </Text>
                 </View>
                 <View style={styles.progressBar}>
@@ -86,8 +78,8 @@ export default function DayDetailModal({ visible, onClose, dayData, date }: DayD
                     style={[
                       styles.progressFill,
                       {
-                        width: `${getProgressPercentage(dayData.nutrition.kcal, 2000)}%`,
-                        backgroundColor: getProgressColor(getProgressPercentage(dayData.nutrition.kcal, 2000))
+                        width: `${getProgressPercentage(displayData.nutrition.kcal, 2000)}%`,
+                        backgroundColor: getProgressColor(getProgressPercentage(displayData.nutrition.kcal, 2000))
                       }
                     ]}
                   />
@@ -97,28 +89,28 @@ export default function DayDetailModal({ visible, onClose, dayData, date }: DayD
               <View style={styles.macrosContainer}>
                 <View style={styles.macroItem}>
                   <Text style={styles.macroLabel}>Glucides</Text>
-                  <Text style={styles.macroValue}>{dayData.nutrition.carbs}g</Text>
+                  <Text style={styles.macroValue}>{displayData.nutrition.carbs}g</Text>
                 </View>
                 <View style={styles.macroItem}>
                   <Text style={styles.macroLabel}>Protéines</Text>
-                  <Text style={styles.macroValue}>{dayData.nutrition.protein}g</Text>
+                  <Text style={styles.macroValue}>{displayData.nutrition.protein}g</Text>
                 </View>
                 <View style={styles.macroItem}>
                   <Text style={styles.macroLabel}>Graisses</Text>
-                  <Text style={styles.macroValue}>{dayData.nutrition.fat}g</Text>
+                  <Text style={styles.macroValue}>{displayData.nutrition.fat}g</Text>
                 </View>
               </View>
             </View>
 
             {/* Section Pas */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>👟 Pas</Text>
+              <Text style={styles.sectionTitle}>Pas</Text>
               
               <View style={styles.progressContainer}>
                 <View style={styles.progressHeader}>
                   <Text style={styles.progressLabel}>Pas effectués</Text>
                   <Text style={styles.progressValue}>
-                    {dayData.steps.count.toLocaleString()} / {dayData.steps.target.toLocaleString()}
+                    {displayData.steps.count.toLocaleString()} / {displayData.steps.target.toLocaleString()}
                   </Text>
                 </View>
                 <View style={styles.progressBar}>
@@ -126,8 +118,8 @@ export default function DayDetailModal({ visible, onClose, dayData, date }: DayD
                     style={[
                       styles.progressFill,
                       {
-                        width: `${getProgressPercentage(dayData.steps.count, dayData.steps.target)}%`,
-                        backgroundColor: getProgressColor(getProgressPercentage(dayData.steps.count, dayData.steps.target))
+                        width: `${getProgressPercentage(displayData.steps.count, displayData.steps.target)}%`,
+                        backgroundColor: getProgressColor(getProgressPercentage(displayData.steps.count, displayData.steps.target))
                       }
                     ]}
                   />
@@ -137,13 +129,13 @@ export default function DayDetailModal({ visible, onClose, dayData, date }: DayD
 
             {/* Section Sport */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>💪 Sport</Text>
+              <Text style={styles.sectionTitle}>Sport</Text>
               
               <View style={styles.progressContainer}>
                 <View style={styles.progressHeader}>
                   <Text style={styles.progressLabel}>Séances terminées</Text>
                   <Text style={styles.progressValue}>
-                    {dayData.workouts.completed} / {dayData.workouts.total}
+                    {displayData.workouts.completed} / {displayData.workouts.total}
                   </Text>
                 </View>
                 <View style={styles.progressBar}>
@@ -151,8 +143,8 @@ export default function DayDetailModal({ visible, onClose, dayData, date }: DayD
                     style={[
                       styles.progressFill,
                       {
-                        width: `${dayData.workouts.total > 0 ? (dayData.workouts.completed / dayData.workouts.total) * 100 : 0}%`,
-                        backgroundColor: getProgressColor(dayData.workouts.total > 0 ? (dayData.workouts.completed / dayData.workouts.total) * 100 : 0)
+                        width: `${displayData.workouts.total > 0 ? (displayData.workouts.completed / displayData.workouts.total) * 100 : 0}%`,
+                        backgroundColor: getProgressColor(displayData.workouts.total > 0 ? (displayData.workouts.completed / displayData.workouts.total) * 100 : 0)
                       }
                     ]}
                   />
@@ -161,76 +153,82 @@ export default function DayDetailModal({ visible, onClose, dayData, date }: DayD
 
               <View style={styles.workoutStats}>
                 <Text style={styles.workoutStatText}>
-                  Calories brûlées : {dayData.workouts.caloriesBurned} kcal
+                  Calories brûlées : {displayData.workouts.caloriesBurned} kcal
                 </Text>
                 <Text style={styles.workoutStatText}>
-                  Objectif : {dayData.workouts.target} kcal
+                  Objectif : {displayData.workouts.target} kcal
                 </Text>
               </View>
             </View>
 
             {/* Section Repas */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>🍽️ Repas</Text>
+              <Text style={styles.sectionTitle}>Repas</Text>
               
               <View style={styles.mealsContainer}>
-                {dayData.meals.breakfast && (
+                {displayData.meals.breakfast && (
                   <View style={styles.mealItem}>
                     <Text style={styles.mealType}>Petit-déjeuner</Text>
                     <Text style={[
                       styles.mealTitle,
-                      dayData.meals.breakfast.eaten && styles.mealEaten
+                      displayData.meals.breakfast.eaten && styles.mealEaten
                     ]}>
-                      {dayData.meals.breakfast.title}
+                      {displayData.meals.breakfast.title}
                     </Text>
                     <Text style={styles.mealStatus}>
-                      {dayData.meals.breakfast.eaten ? '✅ Mangé' : '❌ Non mangé'}
+                      {displayData.meals.breakfast.eaten ? '✅ Mangé' : '❌ Non mangé'}
                     </Text>
                   </View>
                 )}
 
-                {dayData.meals.lunch && (
+                {displayData.meals.lunch && (
                   <View style={styles.mealItem}>
                     <Text style={styles.mealType}>Déjeuner</Text>
                     <Text style={[
                       styles.mealTitle,
-                      dayData.meals.lunch.eaten && styles.mealEaten
+                      displayData.meals.lunch.eaten && styles.mealEaten
                     ]}>
-                      {dayData.meals.lunch.title}
+                      {displayData.meals.lunch.title}
                     </Text>
                     <Text style={styles.mealStatus}>
-                      {dayData.meals.lunch.eaten ? '✅ Mangé' : '❌ Non mangé'}
+                      {displayData.meals.lunch.eaten ? '✅ Mangé' : '❌ Non mangé'}
                     </Text>
                   </View>
                 )}
 
-                {dayData.meals.snack && (
+                {displayData.meals.snack && (
                   <View style={styles.mealItem}>
                     <Text style={styles.mealType}>Collation</Text>
                     <Text style={[
                       styles.mealTitle,
-                      dayData.meals.snack.eaten && styles.mealEaten
+                      displayData.meals.snack.eaten && styles.mealEaten
                     ]}>
-                      {dayData.meals.snack.title}
+                      {displayData.meals.snack.title}
                     </Text>
                     <Text style={styles.mealStatus}>
-                      {dayData.meals.snack.eaten ? '✅ Mangé' : '❌ Non mangé'}
+                      {displayData.meals.snack.eaten ? '✅ Mangé' : '❌ Non mangé'}
                     </Text>
                   </View>
                 )}
 
-                {dayData.meals.dinner && (
+                {displayData.meals.dinner && (
                   <View style={styles.mealItem}>
                     <Text style={styles.mealType}>Dîner</Text>
                     <Text style={[
                       styles.mealTitle,
-                      dayData.meals.dinner.eaten && styles.mealEaten
+                      displayData.meals.dinner.eaten && styles.mealEaten
                     ]}>
-                      {dayData.meals.dinner.title}
+                      {displayData.meals.dinner.title}
                     </Text>
                     <Text style={styles.mealStatus}>
-                      {dayData.meals.dinner.eaten ? '✅ Mangé' : '❌ Non mangé'}
+                      {displayData.meals.dinner.eaten ? '✅ Mangé' : '❌ Non mangé'}
                     </Text>
+                  </View>
+                )}
+                
+                {!displayData.meals.breakfast && !displayData.meals.lunch && !displayData.meals.snack && !displayData.meals.dinner && (
+                  <View style={styles.noDataContainer}>
+                    <Text style={styles.noDataText}>Aucun repas enregistré ce jour</Text>
                   </View>
                 )}
               </View>
@@ -388,3 +386,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 });
+
+
+

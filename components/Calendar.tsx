@@ -31,7 +31,8 @@ export default function Calendar({ selectedDate, onDateSelect, dailyHistory, onD
       const date = new Date(startDate);
       date.setDate(date.getDate() + i);
       
-      const dateString = date.toISOString().split('T')[0];
+      // Utiliser l'heure locale pour éviter les décalages de fuseau horaire
+      const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
       const isCurrentMonth = date.getMonth() === month;
       const isToday = date.toDateString() === today.toDateString();
       const isSelected = dateString === selectedDate;

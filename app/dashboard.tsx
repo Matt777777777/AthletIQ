@@ -87,7 +87,7 @@ export default function Dashboard() {
 
   // États pour le calendrier et l'historique
   const [showCalendar, setShowCalendar] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState<string>('');
   const [showDayDetail, setShowDayDetail] = useState(false);
   const [selectedDayData, setSelectedDayData] = useState<NonNullable<UserProfile['dailyHistory']>[string] | null>(null);
 
@@ -315,13 +315,8 @@ export default function Dashboard() {
     return () => clearInterval(saveInterval);
   }, [profile, dailyIntake, macronutrients, dailySteps, dailyWorkouts, dailyMeals]);
 
-  // Réinitialiser les états du calendrier quand il se ferme
-  useEffect(() => {
-    if (!showCalendar) {
-      setShowDayDetail(false);
-      setSelectedDayData(null);
-    }
-  }, [showCalendar]);
+  // Ne pas fermer automatiquement le modal de détails quand le calendrier se ferme
+  // Le modal se fermera seulement quand l'utilisateur clique sur le X
 
   const loadData = useCallback(async () => {
     try {
@@ -346,7 +341,7 @@ export default function Dashboard() {
       if (profileData?.savedPlans?.workouts) {
         const workouts = profileData.savedPlans.workouts.map(workout => ({
           id: workout.id,
-          title: extractWorkoutTitle(workout.content),
+          title: workout.title,
           content: workout.content,
           date: workout.date
         }));
@@ -857,9 +852,11 @@ export default function Dashboard() {
   const saveCurrentDayToHistory = async () => {
     if (!profile) return;
 
-    const today = new Date().toISOString().split('T')[0];
+    // Utiliser l'heure locale pour éviter les décalages de fuseau horaire
+    const today = new Date();
+    const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     const dayData = {
-      date: today,
+      date: todayString,
       nutrition: {
         kcal: dailyIntake.kcal,
         carbs: macronutrients.carbs,
@@ -901,17 +898,31 @@ export default function Dashboard() {
 
   // Fonction pour charger les données d'une journée sélectionnée
   const handleDateSelect = async (date: string) => {
+    console.log('🗓️ Date sélectionnée:', date);
     setSelectedDate(date);
-    const dayData = await loadDailyHistory(date);
-    setSelectedDayData(dayData);
-    setShowDayDetail(true);
+    
+    try {
+      const dayData = await loadDailyHistory(date);
+      console.log('📊 Données de la journée:', dayData);
+      console.log('📊 Type de dayData:', typeof dayData);
+      console.log('📊 dayData est null?', dayData === null);
+      
+      setSelectedDayData(dayData);
+      setShowDayDetail(true);
+      setShowCalendar(false); // Fermer le calendrier après sélection
+      console.log('✅ Modal ouvert pour la date:', date);
+      console.log('✅ showDayDetail:', true);
+    } catch (error) {
+      console.error('❌ Erreur lors du chargement des données:', error);
+    }
   };
 
   // Fonction pour fermer le calendrier
   const handleCloseCalendar = () => {
     setShowCalendar(false);
-    setShowDayDetail(false);
+    // Ne pas fermer le modal de détails ici, il se fermera avec le calendrier
   };
+
 
 
 
@@ -925,20 +936,21 @@ export default function Dashboard() {
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <Text style={{ color: "#fff", fontSize: 24, fontWeight: "800" }}>
           Salut Matteo
-        </Text>
-        <Pressable
-          onPress={() => setShowCalendar(true)}
-          style={{
-            backgroundColor: "#0070F3",
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-            borderRadius: 8,
-            alignItems: "center",
-            justifyContent: "center",
-            minWidth: 40,
-            minHeight: 40,
-          }}
-        >
+      </Text>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <Pressable
+            onPress={() => setShowCalendar(true)}
+            style={{
+              backgroundColor: "#0070F3",
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderRadius: 8,
+              alignItems: "center",
+              justifyContent: "center",
+              minWidth: 40,
+              minHeight: 40,
+            }}
+          >
           <View style={{ alignItems: "center", justifyContent: "center" }}>
             {/* Icône de calendrier stylisée */}
             <View style={{
@@ -992,6 +1004,8 @@ export default function Dashboard() {
             </View>
           </View>
         </Pressable>
+        
+        </View>
       </View>
 
       {/* Section Nutrition et Pas - 3/4 et 1/4 */}
@@ -1420,10 +1434,10 @@ export default function Dashboard() {
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
             <Text style={{ color: "#0070F3", fontWeight: "700", fontSize: 14 }}>
               Calories dépensées
-            </Text>
+        </Text>
             <Text style={{ color: "#0070F3", fontWeight: "700", fontSize: 14 }}>
               {Math.round(calculateDailyCaloriesBurned())} / {Math.round(calculateDailyCalorieGoal())} kcal
-            </Text>
+          </Text>
           </View>
           
           {/* Barre de progression */}
@@ -1752,7 +1766,7 @@ export default function Dashboard() {
               alignItems: "center",
                 }}
               >
-                <Text style={{ color: "#fff", fontWeight: "600" }}>Importer</Text>
+                <Text style={{ color: "#fff", fontWeight: "600" }}>Importer depuis mes repas enregistrés</Text>
               </Pressable>
               
           <Pressable
@@ -1892,7 +1906,7 @@ export default function Dashboard() {
                 style={{
                   backgroundColor: "#222",
                   padding: 16,
-                  borderRadius: 12,
+              borderRadius: 12,
                   borderWidth: 1,
                   borderColor: "#333",
                 }}
@@ -1955,7 +1969,7 @@ export default function Dashboard() {
                 padding: 12,
                 backgroundColor: "#333",
                 borderRadius: 8,
-                alignItems: "center",
+              alignItems: "center",
               }}
             >
               <Text style={{ color: "#fff", fontWeight: "600" }}>Annuler</Text>
@@ -2036,7 +2050,7 @@ export default function Dashboard() {
                           </Text>
                           {sections.warmup.map((line, index) => (
                             <Text key={index} style={{ color: "#fff", fontSize: 14, marginBottom: 4 }}>
-                              • {line}
+                              {line.startsWith('•') ? line : `• ${line}`}
                             </Text>
                           ))}
                         </View>
@@ -2190,8 +2204,8 @@ export default function Dashboard() {
                 }}
               >
                 <Text style={{ color: "#fff", fontWeight: "600" }}>✕</Text>
-              </Pressable>
-            </View>
+          </Pressable>
+      </View>
 
             <Calendar
               selectedDate={selectedDate}
@@ -2199,7 +2213,7 @@ export default function Dashboard() {
               dailyHistory={profile?.dailyHistory}
               onDayPress={handleDateSelect}
             />
-          </View>
+    </View>
         </View>
       </Modal>
 

@@ -161,20 +161,20 @@ export default function Sport() {
             { name: "Rowing haltères", detail: "3 x 12 • Dos/Biceps" },
             { name: "Gainage", detail: "3 x 45s • Core" },
           ].map((e, index) => (
-            <View
+          <View
               key={index}
-              style={{
-                backgroundColor: "#111",
-                borderColor: "#1d1d1d",
-                borderWidth: 1,
-                borderRadius: 14,
-                padding: 16,
-                marginBottom: 12,
-              }}
-            >
-              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>{e.name}</Text>
-              <Text style={{ color: "#ccc", marginTop: 4 }}>{e.detail}</Text>
-            </View>
+            style={{
+              backgroundColor: "#111",
+              borderColor: "#1d1d1d",
+              borderWidth: 1,
+              borderRadius: 14,
+              padding: 16,
+              marginBottom: 12,
+            }}
+          >
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>{e.name}</Text>
+            <Text style={{ color: "#ccc", marginTop: 4 }}>{e.detail}</Text>
+          </View>
           ))
         )}
       </ScrollView>

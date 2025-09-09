@@ -1,6 +1,6 @@
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useEffect, useRef, useState } from "react";
-import { FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, TouchableWithoutFeedback, View } from "react-native";
+import { FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from "react-native";
 import { estimateKcalTarget } from "../lib/nutrition";
 import { loadProfile, saveDailyMeal, savePlan, saveProfile, UserProfile } from "../lib/profile";
 import { addShoppingItem, extractIngredientsFromAIResponse } from "../lib/shopping";
@@ -26,6 +26,7 @@ export default function Chat() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [lastAIResponse, setLastAIResponse] = useState<Message | null>(null);
   const [showSaveButtons, setShowSaveButtons] = useState(false);
+  const [isUserScrolling, setIsUserScrolling] = useState(false);
   const listRef = useRef<FlatList>(null);
 
   // Fonction pour nettoyer le texte des réponses IA
@@ -125,6 +126,20 @@ export default function Chat() {
     return content;
   };
 
+  // Fonction pour extraire le titre de la séance (avec la date)
+  const extractWorkoutTitle = (content: string): string => {
+    // Diviser le contenu en lignes et filtrer les lignes vides
+    const lines = content.split('\n').filter(line => line.trim().length > 0);
+    
+    // Prendre la première ligne qui contient le titre avec la date
+    if (lines.length > 0) {
+      return lines[0].trim();
+    }
+    
+    // Si pas de contenu, retourner un titre par défaut
+    return "Séance de sport";
+  };
+
   // Fonction pour nettoyer le contenu de la séance
   const cleanWorkoutContent = (content: string): string => {
     // Diviser le contenu en lignes et filtrer les lignes vides
@@ -165,7 +180,25 @@ export default function Chat() {
     return content;
   };
 
+  // Fonction pour générer un repas de démarrage
+  const generateStarterMeal = async () => {
+    const mealPrompt = "Génère-moi un repas équilibré et sain pour le déjeuner, sans matériel spécial, avec des ingrédients simples à trouver. Suis le format obligatoire : commence directement par le nom du plat, puis Ingrédients : et Préparation :";
+    setInput(mealPrompt);
+    // Attendre un petit délai pour que l'input soit mis à jour
+    setTimeout(() => {
+      sendMessage();
+    }, 100);
+  };
 
+  // Fonction pour générer une séance de sport de démarrage
+  const generateStarterWorkout = async () => {
+    const workoutPrompt = "Génère-moi une séance de sport classique d'1 heure sans matériel, adaptée à tous niveaux. Inclus le titre de la séance, le matériel nécessaire (aucun), et les exercices avec répétitions et durées.";
+    setInput(workoutPrompt);
+    // Attendre un petit délai pour que l'input soit mis à jour
+    setTimeout(() => {
+      sendMessage();
+    }, 100);
+  };
 
   // Fonction pour détecter si la réponse contient plusieurs repas du jour
   const detectMultipleMeals = (content: string): boolean => {
@@ -482,11 +515,12 @@ export default function Chat() {
             chatResponses: updatedChatResponses,
             chatQuestionsAsked: true 
           };
+          console.log("🔍 Sauvegarde du profil final:", finalProfile);
           await saveProfile(finalProfile);
           setProfile(finalProfile);
-          console.log("Questions marquées comme posées");
+          console.log("✅ Questions marquées comme posées, profil mis à jour");
         } catch (error) {
-          console.error("Erreur lors de la sauvegarde du flag:", error);
+          console.error("❌ Erreur lors de la sauvegarde du flag:", error);
         }
         
         const completionMessage: Message = {
@@ -622,6 +656,9 @@ export default function Chat() {
         systemPrompt += `\n- Ensuite, liste les ingrédients avec "Ingrédients :"`;
         systemPrompt += `\n- Puis liste la préparation avec "Préparation :"`;
         systemPrompt += `\n- Structure: NOM DU PLAT (1ère ligne) → Ingrédients : → Préparation :`;
+        systemPrompt += `\n- Utilise des puces (•) pour les ingrédients et les étapes de préparation`;
+        systemPrompt += `\n- Format des ingrédients: "• Nom de l'ingrédient - quantité"`;
+        systemPrompt += `\n- Format de la préparation: "• Étape de préparation"`;
         
         // Instructions pour la détection du type de demande
         systemPrompt += "\n\nDÉTECTION DU TYPE DE DEMANDE:";
@@ -635,6 +672,27 @@ export default function Chat() {
         systemPrompt += `\n  * Chaque repas COMMENCE par son nom de plat`;
         systemPrompt += `\n  * Puis liste les ingrédients et la préparation`;
         systemPrompt += `\n  * Total des 4 repas = ${kcalTarget} kcal`;
+        
+        // Instructions spécifiques pour les séances de sport
+        systemPrompt += "\n\nINSTRUCTIONS SPÉCIFIQUES POUR LES SÉANCES DE SPORT:";
+        systemPrompt += `\n- Adapte la difficulté selon le niveau: ${profile.fitnessLevel}`;
+        systemPrompt += `\n- Utilise uniquement le matériel disponible: ${profile.equipment}`;
+        systemPrompt += `\n- Respecte les limitations: ${profile.limitations || 'aucune'}`;
+        systemPrompt += `\n- Propose des exercices adaptés aux horaires: ${profile.preferredTime}`;
+        systemPrompt += `\n- Inclus échauffement, exercices principaux et récupération`;
+        systemPrompt += `\n- Précise les répétitions, séries et temps de repos`;
+        systemPrompt += `\n- Adapte l'intensité selon l'objectif: ${profile.goal}`;
+        
+        // Format obligatoire pour les séances de sport
+        systemPrompt += "\n\nFORMAT OBLIGATOIRE POUR CHAQUE SÉANCE DE SPORT:";
+        systemPrompt += `\n- COMMENCE DIRECTEMENT par le nom de la séance suivi de la date d'aujourd'hui (ex: "Séance HIIT 45min - ${new Date().toLocaleDateString('fr-FR')}", "Circuit training complet - ${new Date().toLocaleDateString('fr-FR')}")`;
+        systemPrompt += `\n- INTERDIT: phrases d'introduction comme "Voici une séance parfaite pour toi :", "Je te propose", "Voici une idée"`;
+        systemPrompt += `\n- Le nom doit être descriptif et motivant`;
+        systemPrompt += `\n- Ensuite, liste le matériel avec "Matériel :"`;
+        systemPrompt += `\n- Puis liste la durée avec "Durée :"`;
+        systemPrompt += `\n- Ensuite, détaille les exercices avec "Exercices :"`;
+        systemPrompt += `\n- Structure: NOM DE LA SÉANCE (1ère ligne) → Matériel : → Durée : → Exercices :`;
+        systemPrompt += `\n- Pour les exercices, utilise le format: "• Nom de l'exercice - X séries de Y répétitions - Z secondes de repos"`;
       }
 
 
@@ -749,65 +807,180 @@ export default function Chat() {
       ]);
     } finally {
       setLoading(false);
+      if (!isUserScrolling) {
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
     }
+  }
   };
 
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: "#000" }}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+      enabled={true}
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 60, paddingHorizontal: 12, marginBottom: 12 }}>
           <Text style={{ color: "#fff", fontSize: 22, fontWeight: "800" }}>
             Ton coach IA
-          </Text>
-          <Pressable
-            onPress={Keyboard.dismiss}
-            style={{
-              backgroundColor: "#333",
-              paddingHorizontal: 12,
-              paddingVertical: 6,
-            borderRadius: 8, 
-            }}
-          >
-            <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
-              Fermer clavier
+        </Text>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <Pressable
+              onPress={() => {
+                if (listRef.current) {
+                  listRef.current.scrollToEnd({ animated: true });
+                }
+              }}
+              style={{
+                backgroundColor: "#0070F3",
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 8,
+              }}
+            >
+              <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
+                ↓ Bas
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setMessages([]);
+                setLastAIResponse(null);
+                setShowSaveButtons(false);
+                setInput("");
+                console.log("Chat réinitialisé");
+              }}
+              style={{
+                backgroundColor: "#2a1a1a",
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 8,
+              }}
+            >
+              <Text style={{ color: "#ff6b6b", fontSize: 12, fontWeight: "600" }}>
+                🗑️ Vider
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                Keyboard.dismiss();
+              }}
+              style={{
+                backgroundColor: "#333",
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 8,
+              }}
+            >
+              <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
+                Fermer clavier
             </Text>
-          </Pressable>
+            </Pressable>
           </View>
+        </View>
+
 
         <FlatList
           ref={listRef}
           data={messages}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingBottom: 12, paddingHorizontal: 12, flexGrow: 1 }}
+          contentContainerStyle={{ 
+            paddingBottom: 12, 
+            paddingHorizontal: 12,
+            flexGrow: 1,
+            minHeight: '100%'
+          }}
+          style={{ flex: 1 }}
           showsVerticalScrollIndicator={true}
           scrollEnabled={true}
           nestedScrollEnabled={true}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          bounces={true}
+          alwaysBounceVertical={false}
+          scrollEventThrottle={16}
           renderItem={({ item }) => (
-            <View
-              style={{
-                alignSelf: item.sender === "user" ? "flex-end" : "flex-start",
-                backgroundColor: item.sender === "user" ? "#0070F3" : "#1b1b1b",
-                marginVertical: 6,
-                padding: 12,
-                borderRadius: 12,
-                maxWidth: "78%",
-              }}
-            >
-              <Text style={{ color: "#fff", lineHeight: 20 }}>
-                {cleanText(item.text)}
-                {item.sender === "ai" && isTyping && item.text === "" && (
-                  <Text style={{ color: "#666" }}>🤖 écrit...</Text>
-                )}
-              </Text>
+            <View>
+              <View
+                style={{
+                  alignSelf: item.sender === "user" ? "flex-end" : "flex-start",
+                  backgroundColor: item.sender === "user" ? "#0070F3" : "#1b1b1b",
+                  marginVertical: 6,
+                  padding: 12,
+                  borderRadius: 12,
+                  maxWidth: "78%",
+                }}
+              >
+                <Text style={{ color: "#fff", lineHeight: 20 }}>
+                  {cleanText(item.text)}
+                  {item.sender === "ai" && isTyping && item.text === "" && (
+                    <Text style={{ color: "#666" }}>🤖 écrit...</Text>
+                  )}
+                </Text>
+              </View>
+              
+              {/* Boutons de démarrage - affichés après le message d'accueil */}
+              {item.id === "welcome" && profile && profile.chatQuestionsAsked && !isAskingProfileQuestions && (
+                <View style={{ padding: 16, alignItems: "center" }}>
+                  <View style={{ flexDirection: "row", gap: 12, width: "100%" }}>
+                    <Pressable
+                      onPress={generateStarterMeal}
+                      style={{
+                        flex: 1,
+                        backgroundColor: "#0070F3",
+                        paddingVertical: 10,
+                        paddingHorizontal: 16,
+                        borderRadius: 8,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        minHeight: 40,
+                      }}
+                    >
+                      <Text style={{ color: "#fff", fontWeight: "600", fontSize: 14, textAlign: "center" }}>
+                        Générer un repas
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={generateStarterWorkout}
+                      style={{
+                        flex: 1,
+                        backgroundColor: "#0070F3",
+                        paddingVertical: 10,
+                        paddingHorizontal: 16,
+                        borderRadius: 8,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        minHeight: 40,
+                      }}
+                    >
+                      <Text style={{ color: "#fff", fontWeight: "600", fontSize: 14, textAlign: "center" }}>
+                        Séance de sport
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
             </View>
           )}
-          onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+          onContentSizeChange={() => {
+            if (!isUserScrolling) {
+              setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
+            }
+          }}
+          onLayout={() => {
+            if (!isUserScrolling) {
+              setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 100);
+            }
+          }}
+          onScrollBeginDrag={() => setIsUserScrolling(true)}
+          onScrollEndDrag={() => {
+            setTimeout(() => setIsUserScrolling(false), 1000);
+          }}
+          onMomentumScrollEnd={() => {
+            setTimeout(() => setIsUserScrolling(false), 1000);
+          }}
         />
 
                 {/* Boutons d'action rapide - affichés seulement après une réponse IA */}
@@ -820,7 +993,7 @@ export default function Chat() {
                 <Text style={{ color: "#8a8a8a", fontSize: 12, marginBottom: 8, textAlign: "center" }}>
                   Enregistrer tous les repas du jour :
                 </Text>
-                <Pressable
+          <Pressable
                   onPress={async () => {
                     try {
                       const meals = extractIndividualMeals(lastAIResponse?.text || '');
@@ -854,7 +1027,7 @@ export default function Chat() {
                     paddingHorizontal: 16,
                     borderRadius: 8,
                     alignItems: "center",
-                    borderWidth: 1,
+              borderWidth: 1,
                     borderColor: "#2a4a2a",
                     marginBottom: 8,
                   }}
@@ -867,15 +1040,15 @@ export default function Chat() {
                 <View style={{ flexDirection: "row", gap: 8 }}>
           <Pressable
                     onPress={async () => {
-                      const workoutTitle = "Séance de sport";
-                      const workoutContent = cleanWorkoutContent(lastAIResponse?.text || '');
-                      const success = await savePlan('workout', workoutTitle, workoutContent);
+                      const mealTitle = extractMealTitle(lastAIResponse?.text || '');
+                      const mealContent = cleanMealContent(lastAIResponse?.text || '');
+                      const success = await savePlan('meal', mealTitle, mealContent);
                       if (success) {
                         const updatedProfile = await loadProfile();
                         setProfile(updatedProfile);
                         const confirmMessage: Message = {
                           id: `confirm_${Date.now()}`,
-                          text: "Séance enregistrée dans tes plans !",
+                          text: "Repas enregistré dans tes plans !",
                           sender: "ai",
                         };
                         setMessages(prev => [...prev, confirmMessage]);
@@ -893,7 +1066,7 @@ export default function Chat() {
                     }}
                   >
                     <Text style={{ color: "#6bff6b", fontWeight: "600", fontSize: 12 }}>
-                      Enregistrer séance
+                      Enregistrer repas
             </Text>
           </Pressable>
 
@@ -935,15 +1108,15 @@ export default function Chat() {
               <View style={{ flexDirection: "row", gap: 8 }}>
           <Pressable
                   onPress={async () => {
-                    const workoutTitle = "Séance de sport";
-                    const workoutContent = cleanWorkoutContent(lastAIResponse?.text || '');
-                    const success = await savePlan('workout', workoutTitle, workoutContent);
+                    const mealTitle = extractMealTitle(lastAIResponse?.text || '');
+                    const mealContent = cleanMealContent(lastAIResponse?.text || '');
+                    const success = await savePlan('meal', mealTitle, mealContent);
                     if (success) {
                       const updatedProfile = await loadProfile();
                       setProfile(updatedProfile);
                       const confirmMessage: Message = {
                         id: `confirm_${Date.now()}`,
-                        text: "Séance enregistrée dans tes plans !",
+                        text: "Repas enregistré dans tes plans !",
                         sender: "ai",
                       };
                       setMessages(prev => [...prev, confirmMessage]);
@@ -961,13 +1134,13 @@ export default function Chat() {
                   }}
                 >
                   <Text style={{ color: "#6bff6b", fontWeight: "600", fontSize: 12 }}>
-                    Enregistrer séance
+                    Enregistrer repas
                   </Text>
                 </Pressable>
 
-                <Pressable
+          <Pressable
                   onPress={async () => {
-                    const workoutTitle = "Séance de sport";
+                    const workoutTitle = extractWorkoutTitle(lastAIResponse?.text || '');
                     const workoutContent = cleanWorkoutContent(lastAIResponse?.text || '');
                     const success = await savePlan('workout', workoutTitle, workoutContent);
                     if (success) {
@@ -988,12 +1161,12 @@ export default function Chat() {
                     paddingHorizontal: 12,
                     borderRadius: 8,
               alignItems: "center",
-                    borderWidth: 1,
+              borderWidth: 1,
                     borderColor: "#2a2a4a",
                   }}
                 >
                   <Text style={{ color: "#6b6bff", fontWeight: "600", fontSize: 12 }}>
-                    Enregistrer repas
+                    Enregistrer séance
             </Text>
           </Pressable>
         </View>
@@ -1093,16 +1266,16 @@ export default function Chat() {
                 paddingVertical: 10,
                 paddingHorizontal: 12,
                 borderRadius: 8,
-                alignItems: "center",
+              alignItems: "center",
                 borderWidth: 1,
                 borderColor: "#4a2a2a",
               }}
             >
               <Text style={{ color: "#ff9f6b", fontWeight: "600", fontSize: 12 }}>
                 Ajouter à ma liste de courses
-              </Text>
-            </Pressable>
-          </View>
+            </Text>
+          </Pressable>
+        </View>
         )}
 
         <View style={{ 
@@ -1147,7 +1320,6 @@ export default function Chat() {
           </Pressable>
         </View>
       </View>
-      </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
 }
