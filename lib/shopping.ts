@@ -167,17 +167,54 @@ export async function getItemsByCategory(): Promise<Record<string, ShoppingItem[
 
 // 🎯 Extraction automatique des ingrédients depuis une réponse IA
 export function extractIngredientsFromAIResponse(text: string): Omit<ShoppingItem, "id" | "dateAdded">[] {
-  // D'abord, essayer d'extraire du JSON structuré (nouveau système)
+  // D'abord, essayer d'extraire du nouveau format "Ingrédients :"
+  const newFormatIngredients = extractIngredientsFromNewFormat(text);
+  if (newFormatIngredients.length > 0) {
+    return newFormatIngredients;
+  }
+  
+  // Ensuite, essayer d'extraire du JSON structuré (ancien système)
   const jsonIngredients = extractIngredientsFromJSON(text);
   if (jsonIngredients.length > 0) {
     return jsonIngredients;
   }
   
-  // Si pas de JSON, utiliser l'ancien système de regex (fallback)
+  // Enfin, utiliser l'ancien système de regex (fallback)
   return extractIngredientsFromText(text);
 }
 
-// 🆕 Nouveau système : Extraction depuis JSON structuré
+// 🆕 Nouveau système : Extraction depuis format "Ingrédients :"
+function extractIngredientsFromNewFormat(text: string): Omit<ShoppingItem, "id" | "dateAdded">[] {
+  try {
+    // Chercher la section "Ingrédients :" jusqu'à "Préparation :"
+    const ingredientsMatch = text.match(/Ingrédients\s*:\s*([\s\S]*?)(?=Préparation\s*:|$)/i);
+    if (!ingredientsMatch) return [];
+    
+    const ingredientsText = ingredientsMatch[1].trim();
+    const ingredients: Omit<ShoppingItem, "id" | "dateAdded">[] = [];
+    
+    // Diviser par lignes et traiter chaque ingrédient
+    const lines = ingredientsText.split('\n').filter(line => line.trim().length > 0);
+    
+    lines.forEach(line => {
+      // Chercher les lignes qui commencent par "•"
+      if (line.trim().startsWith('•')) {
+        const ingredientText = line.trim().substring(1).trim(); // Enlever le "•"
+        const parsed = parseIngredient(ingredientText);
+        if (parsed) {
+          ingredients.push(parsed);
+        }
+      }
+    });
+    
+    return ingredients;
+  } catch (error) {
+    console.log("Erreur parsing nouveau format:", error);
+    return [];
+  }
+}
+
+// 🆕 Ancien système : Extraction depuis JSON structuré
 function extractIngredientsFromJSON(text: string): Omit<ShoppingItem, "id" | "dateAdded">[] {
   try {
     // Chercher les balises <INGREDIENTS>...</INGREDIENTS>

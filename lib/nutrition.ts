@@ -24,8 +24,7 @@ function calculateBMR(profile: UserProfile): number {
   // Formule de Mifflin-St Jeor (plus précise que Harris-Benedict)
   // BMR = 10 * poids(kg) + 6.25 * taille(cm) - 5 * âge + s
   // s = +5 pour hommes, -161 pour femmes
-  // Pour l'instant, on assume homme par défaut (on peut ajouter gender au profil plus tard)
-  const genderFactor = 5; // +5 pour hommes par défaut
+  const genderFactor = profile.gender === "female" ? -161 : 5; // +5 pour hommes, -161 pour femmes
   const bmr = (10 * weight) + (6.25 * height) - (5 * age) + genderFactor;
   
   return Math.round(bmr);

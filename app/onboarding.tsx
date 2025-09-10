@@ -5,6 +5,7 @@ import { saveProfile } from "../lib/profile";
 
 const goals = ["Perdre du poids", "Prendre du muscle", "Être en forme"];
 const diets = ["Végétarien", "Vegan", "Sans gluten", "Aucune restriction"];
+const genders = ["Homme", "Femme"];
 
 export default function Onboarding() {
   const router = useRouter();
@@ -12,6 +13,7 @@ export default function Onboarding() {
   const [goal, setGoal] = useState<string | null>(null);
   const [sessions, setSessions] = useState<number>(4);
   const [diet, setDiet] = useState<string | null>(null);
+  const [gender, setGender] = useState<string | null>(null);
   const [firstName, setFirstName] = useState<string>("");
   const [age, setAge] = useState<string>("");
   const [weight, setWeight] = useState<string>("");
@@ -28,6 +30,7 @@ export default function Onboarding() {
       goal: goal ?? "Être en forme",
       sessions,
       diet: diet ?? "Aucune restriction",
+      gender: gender === "Homme" ? "male" as const : gender === "Femme" ? "female" as const : undefined,
       firstName: firstName.trim() || undefined,
       age: age ? parseInt(age) : undefined,
       weight: weight ? parseFloat(weight) : undefined,
@@ -152,6 +155,31 @@ export default function Onboarding() {
           </Text>
           
           <View style={{ gap: 16 }}>
+            <View>
+              <Text style={{ color: "#aaa", fontSize: 16, marginBottom: 8 }}>
+                Ton sexe
+              </Text>
+              <View style={{ flexDirection: "row", gap: 12 }}>
+                {genders.map((g) => (
+                  <Pressable
+                    key={g}
+                    onPress={() => setGender(g)}
+                    style={{
+                      flex: 1,
+                      backgroundColor: gender === g ? "#0070F3" : "#111",
+                      borderWidth: 1,
+                      borderColor: gender === g ? "#0070F3" : "#222",
+                      padding: 16,
+                      borderRadius: 12,
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600" }}>{g}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
             <View>
               <Text style={{ color: "#aaa", fontSize: 16, marginBottom: 8 }}>
                 Ton prénom

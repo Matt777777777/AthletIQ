@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useEffect, useRef, useState } from "react";
 import { FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from "react-native";
@@ -29,6 +30,26 @@ export default function Chat() {
   const [isUserScrolling, setIsUserScrolling] = useState(false);
   const listRef = useRef<FlatList>(null);
 
+  // Fonction pour vérifier et réinitialiser le chat quotidiennement
+  const checkAndResetDailyChat = async () => {
+    try {
+      const today = new Date().toDateString();
+      const lastChatReset = await AsyncStorage.getItem('lastChatReset');
+      
+      if (lastChatReset !== today) {
+        // Nouveau jour, réinitialiser le chat
+        setMessages([]);
+        setLastAIResponse(null);
+        setShowSaveButtons(false);
+        setInput("");
+        await AsyncStorage.setItem('lastChatReset', today);
+        console.log("Chat réinitialisé automatiquement pour le nouveau jour");
+      }
+    } catch (error) {
+      console.log("Erreur lors de la vérification de réinitialisation quotidienne:", error);
+    }
+  };
+
   // Fonction pour nettoyer le texte des réponses IA
   const cleanText = (text: string): string => {
     return text
@@ -38,8 +59,6 @@ export default function Chat() {
       .replace(/\*(.*?)\*/g, '$1') // Enlever les * (italique)
       .replace(/`(.*?)`/g, '$1') // Enlever les ` (code)
       .replace(/~~(.*?)~~/g, '$1') // Enlever les ~~ (barré)
-      // Masquer la section "Ingrédients :" pour l'affichage
-      .replace(/Ingrédients\s*:[\s\S]*?(?=Préparation\s*:|$)/g, '')
       // Nettoyer les listes et puces
       .replace(/^[\s]*[-*+]\s+/gm, '• ') // Remplacer les puces par •
       .replace(/^[\s]*\d+\.\s+/gm, '') // Enlever les numérotations
@@ -335,6 +354,9 @@ export default function Chat() {
   useEffect(() => {
     const initializeChat = async () => {
       try {
+        // Vérifier et réinitialiser le chat quotidiennement
+        await checkAndResetDailyChat();
+        
         const loadedProfile = await loadProfile();
         setProfile(loadedProfile);
         
@@ -570,6 +592,9 @@ export default function Chat() {
         if (profile.firstName) {
           systemPrompt += `\n- Prénom: ${profile.firstName}`;
         }
+        if (profile.gender) {
+          systemPrompt += `\n- Sexe: ${profile.gender === "male" ? "Homme" : "Femme"}`;
+        }
         if (profile.age) {
           systemPrompt += `\n- Âge: ${profile.age} ans`;
         }
@@ -697,20 +722,16 @@ export default function Chat() {
 
 
               systemPrompt += "\n\nFORMAT RECETTES - Utilise TOUJOURS :" +
-        "\n<INGREDIENTS>" +
-        "\n{\"ingredients\": [{\"name\": \"nom\", \"quantity\": \"qty\", \"unit\": \"unité\", \"category\": \"catégorie\"}]}" +
-        "\n</INGREDIENTS>" +
-        "\n" +
-        "Catégories: Fruits, Légumes, Protéines, Céréales, Épicerie, Laitages, Autres" +
-        "\nUnités: g, kg, ml, l, cuillères, tasses, pincées, branches, gousses, tranches, unités" +
+        "\n- NOM DU PLAT (1ère ligne) - SANS phrase d'introduction" +
+        "\n- Ingrédients : (liste chaque ingrédient avec sa quantité adaptée au profil utilisateur)" +
+        "\n- Préparation : (avec les étapes)" +
         "\n" +
         "IMPORTANT: Réponses concises et directes. Évite les répétitions et les détails superflus." +
         "\n" +
-        "FORMAT AFFICHAGE REPAS:" +
-        "\n- NOM DU PLAT (1ère ligne) - SANS phrase d'introduction" +
-        "\n- Ingrédients : (section masquée pour l'utilisateur mais présente pour extraction)" +
-        "\n- Préparation : (avec les étapes)" +
-        "\n- Les ingrédients sont cachés dans l'affichage mais disponibles pour la liste de course" +
+        "POUR LES INGRÉDIENTS:" +
+        `\n- Adapte les quantités selon le sexe (${profile?.gender === "male" ? "Homme" : "Femme"}), le poids (${profile?.weight}kg) et les objectifs (${profile?.goal})` +
+        "\n- Utilise le format: '• 200g de poulet', '• 150g de riz', '• 1 cuillère à soupe d'huile d'olive'" +
+        `\n- Sois précis sur les quantités pour ${profile?.gender === "male" ? "un homme" : "une femme"} de ${profile?.weight}kg` +
         "\n" +
         "INTERDICTIONS STRICTES:" +
         "\n- JAMAIS de phrases comme 'Voici un dîner savoureux pour toi :'" +
@@ -841,26 +862,7 @@ export default function Chat() {
             >
               <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
                 ↓ Bas
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => {
-                setMessages([]);
-                setLastAIResponse(null);
-                setShowSaveButtons(false);
-                setInput("");
-                console.log("Chat réinitialisé");
-              }}
-              style={{
-                backgroundColor: "#2a1a1a",
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-                borderRadius: 8,
-              }}
-            >
-              <Text style={{ color: "#ff6b6b", fontSize: 12, fontWeight: "600" }}>
-                🗑️ Vider
-              </Text>
+          </Text>
             </Pressable>
             <Pressable
               onPress={() => {
@@ -870,7 +872,7 @@ export default function Chat() {
                 backgroundColor: "#333",
                 paddingHorizontal: 12,
                 paddingVertical: 6,
-                borderRadius: 8,
+            borderRadius: 8, 
               }}
             >
               <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
@@ -902,22 +904,22 @@ export default function Chat() {
           scrollEventThrottle={16}
           renderItem={({ item }) => (
             <View>
-              <View
-                style={{
-                  alignSelf: item.sender === "user" ? "flex-end" : "flex-start",
-                  backgroundColor: item.sender === "user" ? "#0070F3" : "#1b1b1b",
-                  marginVertical: 6,
-                  padding: 12,
-                  borderRadius: 12,
-                  maxWidth: "78%",
-                }}
-              >
-                <Text style={{ color: "#fff", lineHeight: 20 }}>
+            <View
+              style={{
+                alignSelf: item.sender === "user" ? "flex-end" : "flex-start",
+                backgroundColor: item.sender === "user" ? "#0070F3" : "#1b1b1b",
+                marginVertical: 6,
+                padding: 12,
+                borderRadius: 12,
+                maxWidth: "78%",
+              }}
+            >
+              <Text style={{ color: "#fff", lineHeight: 20 }}>
                   {cleanText(item.text)}
                   {item.sender === "ai" && isTyping && item.text === "" && (
                     <Text style={{ color: "#666" }}>🤖 écrit...</Text>
                   )}
-                </Text>
+              </Text>
               </View>
               
               {/* Boutons de démarrage - affichés après le message d'accueil */}
@@ -960,8 +962,8 @@ export default function Chat() {
                       </Text>
                     </Pressable>
                   </View>
-                </View>
-              )}
+            </View>
+          )}
             </View>
           )}
           onContentSizeChange={() => {
@@ -1182,12 +1184,7 @@ export default function Chat() {
             <Pressable
               onPress={async () => {
                 try {
-                  // Trouver le dernier message IA avec originalText
-                  const lastAIMessage = messages
-                    .filter(m => m.sender === "ai")
-                    .pop();
-                  
-                  if (!lastAIMessage) {
+                  if (!lastAIResponse) {
                     const errorMessage: Message = {
                       id: `error_${Date.now()}`,
                       text: "Aucun message IA trouvé.",
@@ -1199,32 +1196,16 @@ export default function Chat() {
                   
                   // TOUJOURS utiliser originalText pour l'extraction des ingrédients
                   // car il contient les balises <INGREDIENTS>...</INGREDIENTS>
-                  console.log('Debug - lastAIMessage:', lastAIMessage);
-                  console.log('Debug - originalText:', lastAIMessage.originalText);
-                  console.log('Debug - text:', lastAIMessage.text);
+                  console.log('Debug - lastAIResponse:', lastAIResponse);
+                  console.log('Debug - originalText:', lastAIResponse.originalText);
+                  console.log('Debug - text:', lastAIResponse.text);
                   
-                  let textToExtract = lastAIMessage.originalText;
+                  let textToExtract = lastAIResponse.originalText;
                   
-                  // Si originalText n'est pas disponible, essayer de le récupérer depuis les messages
+                  // Si originalText n'est pas disponible, utiliser le texte normal
                   if (!textToExtract) {
-                    console.log('originalText non disponible, recherche dans les messages...');
-                    // Chercher le dernier message IA dans la liste des messages
-                    const lastAIMessageFromHistory = messages
-                      .filter(msg => msg.sender === 'ai')
-                      .pop();
-                    
-                    if (lastAIMessageFromHistory && lastAIMessageFromHistory.originalText) {
-                      textToExtract = lastAIMessageFromHistory.originalText;
-                      console.log('originalText trouvé dans l\'historique des messages');
-                    } else {
-                      const errorMessage: Message = {
-                        id: `error_${Date.now()}`,
-                        text: "Impossible d'extraire les ingrédients. Le texte original n'est plus disponible.",
-                        sender: "ai",
-                      };
-                      setMessages(prev => [...prev, errorMessage]);
-                      return;
-                    }
+                    console.log('originalText non disponible, utilisation du texte normal');
+                    textToExtract = lastAIResponse.text;
                   }
                   const extractedItems = extractIngredientsFromAIResponse(textToExtract);
                   

@@ -189,6 +189,7 @@ export default function Profile() {
   const [age, setAge] = useState("");
   const [weight, setWeight] = useState("");
   const [height, setHeight] = useState("");
+  const [gender, setGender] = useState<string>("");
   
   // États pour l'édition des préférences
   const [goal, setGoal] = useState("");
@@ -242,6 +243,7 @@ export default function Profile() {
         setAge(userProfile.age?.toString() || "");
         setWeight(userProfile.weight?.toString() || "");
         setHeight(userProfile.height?.toString() || "");
+        setGender(userProfile.gender === "male" ? "Homme" : userProfile.gender === "female" ? "Femme" : "");
         
         // Initialiser les états des préférences
         setGoal(userProfile.goal || "");
@@ -273,6 +275,7 @@ export default function Profile() {
         age: age ? parseInt(age) : undefined,
         weight: weight ? parseFloat(weight) : undefined,
         height: height ? parseFloat(height) : undefined,
+        gender: gender === "Homme" ? "male" as const : gender === "Femme" ? "female" as const : undefined,
       };
       
       await saveProfile(updatedProfile);
@@ -524,6 +527,37 @@ export default function Profile() {
         </View>
 
         <View style={{ gap: 16 }}>
+          <View>
+            <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>
+              Sexe
+            </Text>
+            {isEditing ? (
+              <View style={{ flexDirection: "row", gap: 12 }}>
+                {["Homme", "Femme"].map((g) => (
+                  <Pressable
+                    key={g}
+                    onPress={() => setGender(g)}
+                    style={{
+                      flex: 1,
+                      backgroundColor: gender === g ? "#0070F3" : "#222",
+                      borderWidth: 1,
+                      borderColor: gender === g ? "#0070F3" : "#333",
+                      padding: 12,
+                      borderRadius: 8,
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600" }}>{g}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : (
+              <Text style={{ color: "#fff", fontSize: 16, paddingVertical: 4 }}>
+                {profile?.gender === "male" ? "Homme" : profile?.gender === "female" ? "Femme" : "Non renseigné"}
+              </Text>
+            )}
+          </View>
+
           <View>
             <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>
               Prénom
