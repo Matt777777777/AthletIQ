@@ -1,5 +1,6 @@
 // lib/plans.ts
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { storageAdapter } from "./storage-adapter-simple";
 
 export type PlanType = "workout" | "meal";
 
@@ -15,18 +16,44 @@ const KEY = "the_sport_saved_plans_v1";
 
 // 🔄 Récupérer tous les plans enregistrés
 async function getAll(): Promise<SavedPlan[]> {
-  const raw = await AsyncStorage.getItem(KEY);
-  if (!raw) return [];
   try {
+    // Utiliser le storage adapter avec fallback automatique
+    const plans = await storageAdapter.load(KEY);
+    if (plans) return plans as SavedPlan[];
+    
+    // Fallback vers AsyncStorage si pas de données
+    const raw = await AsyncStorage.getItem(KEY);
+    if (!raw) return [];
     return JSON.parse(raw) as SavedPlan[];
-  } catch {
-    return [];
+  } catch (e) {
+    console.error("Erreur en chargeant les plans:", e);
+    // Fallback vers AsyncStorage en cas d'erreur
+    try {
+      const raw = await AsyncStorage.getItem(KEY);
+      if (!raw) return [];
+      return JSON.parse(raw) as SavedPlan[];
+    } catch (fallbackError) {
+      console.error("❌ Erreur fallback AsyncStorage:", fallbackError);
+      return [];
+    }
   }
 }
 
 // 🔒 Sauvegarder toute la liste
 async function setAll(plans: SavedPlan[]) {
-  await AsyncStorage.setItem(KEY, JSON.stringify(plans));
+  try {
+    // Utiliser le storage adapter avec fallback automatique
+    await storageAdapter.save(KEY, plans);
+  } catch (e) {
+    console.error("Erreur en sauvegardant les plans:", e);
+    // Fallback vers AsyncStorage en cas d'erreur
+    try {
+      await AsyncStorage.setItem(KEY, JSON.stringify(plans));
+      console.log("✅ Plans sauvegardés en fallback (AsyncStorage)");
+    } catch (fallbackError) {
+      console.error("❌ Erreur fallback AsyncStorage:", fallbackError);
+    }
+  }
 }
 
 // ➕ Ajouter un plan (on génère un id + date automatiquement)

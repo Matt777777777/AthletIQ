@@ -1,5 +1,6 @@
 // lib/profile.ts
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { storageAdapter } from "./storage-adapter-simple";
 
 export type UserProfile = {
   goal: string;     // Exemple : "Perdre du poids", "Prendre du muscle", "Être en forme"
@@ -139,30 +140,59 @@ const KEY = "the_sport_profile_v1";
 // Sauvegarder le profil de l’utilisateur en local
 export async function saveProfile(p: UserProfile) {
   try {
-    await AsyncStorage.setItem(KEY, JSON.stringify(p));
+    // Utiliser le storage adapter avec fallback automatique
+    await storageAdapter.save(KEY, p);
   } catch (e) {
     console.error("Erreur en sauvegardant le profil:", e);
+    // Fallback vers AsyncStorage en cas d'erreur
+    try {
+      await AsyncStorage.setItem(KEY, JSON.stringify(p));
+      console.log("✅ Profil sauvegardé en fallback (AsyncStorage)");
+    } catch (fallbackError) {
+      console.error("❌ Erreur fallback AsyncStorage:", fallbackError);
+    }
   }
 }
 
 // Charger le profil de l'utilisateur depuis le stockage local
 export async function loadProfile(): Promise<UserProfile | null> {
   try {
+    // Utiliser le storage adapter avec fallback automatique
+    const profile = await storageAdapter.load(KEY);
+    if (profile) return profile as UserProfile;
+    
+    // Fallback vers AsyncStorage si pas de données
     const raw = await AsyncStorage.getItem(KEY);
     if (!raw) return null;
     return JSON.parse(raw) as UserProfile;
   } catch (e) {
     console.error("Erreur en chargeant le profil:", e);
-    return null;
+    // Fallback vers AsyncStorage en cas d'erreur
+    try {
+      const raw = await AsyncStorage.getItem(KEY);
+      if (!raw) return null;
+      return JSON.parse(raw) as UserProfile;
+    } catch (fallbackError) {
+      console.error("❌ Erreur fallback AsyncStorage:", fallbackError);
+      return null;
+    }
   }
 }
 
 // Supprimer le profil (utile pour les tests)
 export async function deleteProfile(): Promise<void> {
   try {
-    await AsyncStorage.removeItem(KEY);
+    // Utiliser le storage adapter avec fallback automatique
+    await storageAdapter.remove(KEY);
   } catch (e) {
     console.error("Erreur en supprimant le profil:", e);
+    // Fallback vers AsyncStorage en cas d'erreur
+    try {
+      await AsyncStorage.removeItem(KEY);
+      console.log("✅ Profil supprimé en fallback (AsyncStorage)");
+    } catch (fallbackError) {
+      console.error("❌ Erreur fallback AsyncStorage:", fallbackError);
+    }
   }
 }
 
