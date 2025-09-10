@@ -1,5 +1,6 @@
 // lib/shopping.ts
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { storageAdapter } from "./storage-adapter-simple";
 
 export type ShoppingItem = {
   id: string;
@@ -18,18 +19,31 @@ const KEY = "the_sport_shopping_list_v1";
 
 // 🔄 Récupérer toute la liste
 async function getAll(): Promise<ShoppingList> {
-  const raw = await AsyncStorage.getItem(KEY);
-  if (!raw) return [];
   try {
-    return JSON.parse(raw) as ShoppingList;
-  } catch {
-    return [];
+    const data = await storageAdapter.load(KEY);
+    return data || [];
+  } catch (error) {
+    console.error('Erreur chargement liste de courses:', error);
+    // Fallback vers AsyncStorage
+    try {
+      const raw = await AsyncStorage.getItem(KEY);
+      if (!raw) return [];
+      return JSON.parse(raw) as ShoppingList;
+    } catch {
+      return [];
+    }
   }
 }
 
 // 🔒 Sauvegarder toute la liste
 async function setAll(items: ShoppingList) {
-  await AsyncStorage.setItem(KEY, JSON.stringify(items));
+  try {
+    await storageAdapter.save(KEY, items);
+  } catch (error) {
+    console.error('Erreur sauvegarde liste de courses:', error);
+    // Fallback vers AsyncStorage
+    await AsyncStorage.setItem(KEY, JSON.stringify(items));
+  }
 }
 
 // ➕ Ajouter un ingrédient

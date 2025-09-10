@@ -1,6 +1,7 @@
 // lib/nutrition.ts
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { UserProfile } from "./profile";
+import { storageAdapter } from "./storage-adapter-simple";
 
 const DAILY_INTAKE_KEY = "the_sport_daily_intake_v1";
 
@@ -119,12 +120,19 @@ export function estimateKcalTarget(profile: UserProfile): number {
  */
 export async function loadDailyIntake(): Promise<DailyIntake> {
   try {
-    const raw = await AsyncStorage.getItem(DAILY_INTAKE_KEY);
-    if (!raw) return { kcal: 0 };
-    return JSON.parse(raw) as DailyIntake;
-  } catch (e) {
-    console.error("Erreur en chargeant l'apport quotidien:", e);
-    return { kcal: 0 };
+    const data = await storageAdapter.load(DAILY_INTAKE_KEY);
+    return data || { kcal: 0 };
+  } catch (error) {
+    console.error('Erreur chargement apport nutritionnel:', error);
+    // Fallback vers AsyncStorage
+    try {
+      const raw = await AsyncStorage.getItem(DAILY_INTAKE_KEY);
+      if (!raw) return { kcal: 0 };
+      return JSON.parse(raw) as DailyIntake;
+    } catch (e) {
+      console.error("Erreur en chargeant l'apport quotidien:", e);
+      return { kcal: 0 };
+    }
   }
 }
 
@@ -133,9 +141,15 @@ export async function loadDailyIntake(): Promise<DailyIntake> {
  */
 export async function saveDailyIntake(intake: DailyIntake): Promise<void> {
   try {
-    await AsyncStorage.setItem(DAILY_INTAKE_KEY, JSON.stringify(intake));
-  } catch (e) {
-    console.error("Erreur en sauvegardant l'apport quotidien:", e);
+    await storageAdapter.save(DAILY_INTAKE_KEY, intake);
+  } catch (error) {
+    console.error('Erreur sauvegarde apport nutritionnel:', error);
+    // Fallback vers AsyncStorage
+    try {
+      await AsyncStorage.setItem(DAILY_INTAKE_KEY, JSON.stringify(intake));
+    } catch (e) {
+      console.error("Erreur en sauvegardant l'apport quotidien:", e);
+    }
   }
 }
 

@@ -1,25 +1,56 @@
 // lib/supabase.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Configuration Supabase
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://your-project.supabase.co';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'your-anon-key';
 
-// Client Supabase avec AsyncStorage pour la persistance
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    storage: AsyncStorage,
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false,
-  },
-  global: {
-    headers: {
-      'X-Client-Info': 'supabase-js-react-native',
-    },
-  },
-});
+// Client Supabase lazy (initialisé seulement quand nécessaire)
+let supabaseClient: SupabaseClient | null = null;
+
+export function getSupabaseClient(): SupabaseClient {
+  if (!supabaseClient) {
+    try {
+      supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: {
+          storage: AsyncStorage,
+          autoRefreshToken: true,
+          persistSession: true,
+          detectSessionInUrl: false,
+          flowType: 'pkce',
+        },
+        global: {
+          headers: {
+            'X-Client-Info': 'supabase-js-react-native',
+          },
+        },
+        realtime: {
+          params: {
+            eventsPerSecond: 10,
+          },
+        },
+      });
+      console.log('✅ Client Supabase initialisé');
+    } catch (error) {
+      console.error('❌ Erreur initialisation Supabase:', error);
+      throw error;
+    }
+  }
+  return supabaseClient;
+}
+
+// Export pour compatibilité
+export const supabase = {
+  get auth() { return getSupabaseClient().auth; },
+  get from() { return getSupabaseClient().from; },
+  get storage() { return getSupabaseClient().storage; },
+  get realtime() { return getSupabaseClient().realtime; },
+  get channel() { return getSupabaseClient().channel; },
+  get removeChannel() { return getSupabaseClient().removeChannel; },
+  get removeAllChannels() { return getSupabaseClient().removeAllChannels; },
+  get getChannels() { return getSupabaseClient().getChannels; },
+};
 
 // Configuration de base de données
 export const TABLES = {
@@ -285,7 +316,8 @@ export type Database = {
 // Fonction utilitaire pour obtenir l'ID utilisateur actuel
 export async function getCurrentUserId(): Promise<string | null> {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const client = getSupabaseClient();
+    const { data: { user } } = await client.auth.getUser();
     return user?.id || null;
   } catch (error) {
     console.error('Erreur lors de la récupération de l\'utilisateur:', error);
@@ -303,7 +335,8 @@ export async function isSupabaseConnected(): Promise<boolean> {
     }
 
     // Test simple de connexion
-    const { data, error } = await supabase.from('profiles').select('id').limit(1);
+    const client = getSupabaseClient();
+    const { data, error } = await client.from('profiles').select('id').limit(1);
     return !error;
   } catch (error) {
     console.error('Supabase non connecté:', error);
