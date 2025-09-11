@@ -168,6 +168,15 @@ class StorageAdapter {
       case 'daily_intake':
         await this.saveDailyIntakeToSupabase(userId, data);
         break;
+      case 'daily_steps':
+        await this.saveDailyStepsToSupabase(userId, data);
+        break;
+      case 'day_plans':
+        await this.saveDayPlansToSupabase(userId, data);
+        break;
+      case 'chat_messages':
+        await this.saveChatMessagesToSupabase(userId, data);
+        break;
       default:
         // Pour les autres tables, sauvegarder en JSON
         const client = getSupabaseClient();
@@ -210,6 +219,12 @@ class StorageAdapter {
         return await this.loadShoppingItemsFromSupabase(userId);
       case 'daily_intake':
         return await this.loadDailyIntakeFromSupabase(userId);
+      case 'daily_steps':
+        return await this.loadDailyStepsFromSupabase(userId);
+      case 'day_plans':
+        return await this.loadDayPlansFromSupabase(userId);
+      case 'chat_messages':
+        return await this.loadChatMessagesFromSupabase(userId);
       default:
         // Pour les autres tables, charger depuis JSON
         const client = getSupabaseClient();
@@ -335,7 +350,7 @@ class StorageAdapter {
     }
 
     // Insérer les nouveaux plans
-    const plansToInsert = plans.map(plan => ({
+    const plansToInsert = plans.map((plan: any) => ({
       user_id: userId,
       type: plan.type,
       title: plan.title,
@@ -363,7 +378,7 @@ class StorageAdapter {
     if (!data || data.length === 0) return [];
 
     // Convertir le format Supabase vers le format AsyncStorage
-    return data.map(plan => ({
+    return data.map((plan: any) => ({
       id: plan.id,
       type: plan.type,
       title: plan.title,
@@ -422,7 +437,7 @@ class StorageAdapter {
     if (!data || data.length === 0) return [];
 
     // Convertir le format Supabase vers le format AsyncStorage
-    return data.map(item => ({
+    return data.map((item: any) => ({
       id: item.id,
       name: item.name,
       quantity: item.quantity,
@@ -494,6 +509,211 @@ class StorageAdapter {
     return {
       kcal: data.kcal,
     };
+  }
+
+  // Méthodes spécifiques pour les pas de marche
+  private async saveDailyStepsToSupabase(userId: string, steps: any): Promise<void> {
+    if (!steps || typeof steps.steps !== 'number') {
+      console.log('Aucun pas de marche à sauvegarder');
+      return;
+    }
+
+    const client = getSupabaseClient();
+    const today = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD
+
+    // Supprimer l'ancien enregistrement du jour
+    const { error: deleteError } = await client
+      .from('daily_steps')
+      .delete()
+      .eq('user_id', userId)
+      .eq('date', today);
+
+    if (deleteError) {
+      console.warn('Erreur suppression anciens pas:', deleteError);
+    }
+
+    // Insérer le nouvel enregistrement
+    const { error: insertError } = await client
+      .from('daily_steps')
+      .insert({
+        user_id: userId,
+        date: today,
+        steps: steps.steps,
+        last_updated: steps.lastUpdated || new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      });
+
+    if (insertError) throw insertError;
+    console.log(`✅ Pas de marche sauvegardés dans Supabase: ${steps.steps} pas`);
+  }
+
+  private async loadDailyStepsFromSupabase(userId: string): Promise<any> {
+    const client = getSupabaseClient();
+    const today = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD
+
+    const { data, error } = await client
+      .from('daily_steps')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('date', today)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // Aucun enregistrement trouvé, retourner les pas par défaut
+        return { steps: 0, lastUpdated: new Date().toISOString() };
+      }
+      throw error;
+    }
+
+    if (!data) return { steps: 0, lastUpdated: new Date().toISOString() };
+
+    // Convertir le format Supabase vers le format AsyncStorage
+    return {
+      steps: data.steps,
+      lastUpdated: data.last_updated,
+    };
+  }
+
+  // Méthodes spécifiques pour les plans de jour
+  private async saveDayPlansToSupabase(userId: string, plans: any[]): Promise<void> {
+    if (!Array.isArray(plans) || plans.length === 0) {
+      console.log('Aucun plan de jour à sauvegarder');
+      return;
+    }
+
+    const client = getSupabaseClient();
+
+    // Supprimer tous les anciens plans de l'utilisateur
+    const { error: deleteError } = await client
+      .from('day_plans')
+      .delete()
+      .eq('user_id', userId);
+
+    if (deleteError) {
+      console.warn('Erreur suppression anciens plans de jour:', deleteError);
+    }
+
+    // Insérer tous les nouveaux plans
+    const plansToInsert = plans.map((plan: any) => ({
+      user_id: userId,
+      plan_id: plan.id,
+      title: plan.title,
+      date: plan.date,
+      workout_title: plan.workout.title,
+      workout_content: plan.workout.content,
+      breakfast_title: plan.meals.breakfast.title,
+      breakfast_content: plan.meals.breakfast.content,
+      lunch_title: plan.meals.lunch.title,
+      lunch_content: plan.meals.lunch.content,
+      dinner_title: plan.meals.dinner.title,
+      dinner_content: plan.meals.dinner.content,
+      shopping_list: JSON.stringify(plan.shoppingList),
+      created_at: plan.createdAt,
+    }));
+
+    const { error: insertError } = await client
+      .from('day_plans')
+      .insert(plansToInsert);
+
+    if (insertError) throw insertError;
+    console.log(`✅ ${plans.length} plans de jour sauvegardés dans Supabase`);
+  }
+
+  private async loadDayPlansFromSupabase(userId: string): Promise<any> {
+    const client = getSupabaseClient();
+    const { data, error } = await client
+      .from('day_plans')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    if (!data || data.length === 0) return [];
+
+    // Convertir le format Supabase vers le format AsyncStorage
+    return data.map((plan: any) => ({
+      id: plan.plan_id,
+      title: plan.title,
+      date: plan.date,
+      workout: {
+        title: plan.workout_title,
+        content: plan.workout_content,
+      },
+      meals: {
+        breakfast: {
+          title: plan.breakfast_title,
+          content: plan.breakfast_content,
+        },
+        lunch: {
+          title: plan.lunch_title,
+          content: plan.lunch_content,
+        },
+        dinner: {
+          title: plan.dinner_title,
+          content: plan.dinner_content,
+        },
+      },
+      shoppingList: JSON.parse(plan.shopping_list || '[]'),
+      createdAt: plan.created_at,
+    }));
+  }
+
+  // Méthodes spécifiques pour les messages de chat
+  private async saveChatMessagesToSupabase(userId: string, messages: any[]): Promise<void> {
+    if (!Array.isArray(messages) || messages.length === 0) {
+      console.log('Aucun message de chat à sauvegarder');
+      return;
+    }
+
+    const client = getSupabaseClient();
+
+    // Supprimer tous les anciens messages de l'utilisateur
+    const { error: deleteError } = await client
+      .from('chat_messages')
+      .delete()
+      .eq('user_id', userId);
+
+    if (deleteError) {
+      console.warn('Erreur suppression anciens messages:', deleteError);
+    }
+
+    // Insérer tous les nouveaux messages
+    const messagesToInsert = messages.map(message => ({
+      user_id: userId,
+      message_id: message.id,
+      text: message.text,
+      sender: message.sender,
+      original_text: message.originalText || null,
+      created_at: new Date().toISOString(),
+    }));
+
+    const { error: insertError } = await client
+      .from('chat_messages')
+      .insert(messagesToInsert);
+
+    if (insertError) throw insertError;
+    console.log(`✅ ${messages.length} messages de chat sauvegardés dans Supabase`);
+  }
+
+  private async loadChatMessagesFromSupabase(userId: string): Promise<any> {
+    const client = getSupabaseClient();
+    const { data, error } = await client
+      .from('chat_messages')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    if (!data || data.length === 0) return [];
+
+    // Convertir le format Supabase vers le format AsyncStorage
+    return data.map((message: any) => ({
+      id: message.message_id,
+      text: message.text,
+      sender: message.sender,
+      originalText: message.original_text,
+    }));
   }
 }
 

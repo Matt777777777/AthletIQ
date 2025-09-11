@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useEffect, useRef, useState } from "react";
 import { FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from "react-native";
+import { addChatMessage, checkAndResetDailyChat, clearChatMessages, loadChatMessages, Message, saveChatMessages, updateChatMessage } from "../lib/chat";
 import { estimateKcalTarget } from "../lib/nutrition";
 import { loadProfile, saveDailyMeal, savePlan, saveProfile, UserProfile } from "../lib/profile";
 import { addShoppingItem, extractIngredientsFromAIResponse } from "../lib/shopping";
@@ -10,12 +11,7 @@ import { addShoppingItem, extractIngredientsFromAIResponse } from "../lib/shoppi
 const endpoint =
   "https://the-sport-backend-o6wzopx00-matts-projects-43da855b.vercel.app/api/chat";
 
-type Message = {
-  id: string;
-  text: string;
-  sender: "user" | "ai";
-  originalText?: string; // Texte original avec balises JSON
-};
+// Message type is now imported from lib/chat
 
 export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -31,20 +27,15 @@ export default function Chat() {
   const listRef = useRef<FlatList>(null);
 
   // Fonction pour vérifier et réinitialiser le chat quotidiennement
-  const checkAndResetDailyChat = async () => {
+  const handleDailyChatReset = async () => {
     try {
-      const today = new Date().toDateString();
-      const lastChatReset = await AsyncStorage.getItem('lastChatReset');
-      
-      if (lastChatReset !== today) {
-        // Nouveau jour, réinitialiser le chat
-        setMessages([]);
-        setLastAIResponse(null);
-        setShowSaveButtons(false);
-        setInput("");
-        await AsyncStorage.setItem('lastChatReset', today);
-        console.log("Chat réinitialisé automatiquement pour le nouveau jour");
-      }
+      await checkAndResetDailyChat();
+      // Recharger les messages après la réinitialisation
+      const loadedMessages = await loadChatMessages();
+      setMessages(loadedMessages);
+      setLastAIResponse(null);
+      setShowSaveButtons(false);
+      setInput("");
     } catch (error) {
       console.log("Erreur lors de la vérification de réinitialisation quotidienne:", error);
     }
@@ -355,7 +346,7 @@ export default function Chat() {
     const initializeChat = async () => {
       try {
         // Vérifier et réinitialiser le chat quotidiennement
-        await checkAndResetDailyChat();
+        await handleDailyChatReset();
         
         const loadedProfile = await loadProfile();
         setProfile(loadedProfile);
@@ -479,6 +470,9 @@ export default function Chat() {
       sender: "user",
     };
     setMessages(prev => [...prev, userMessage]);
+    // Sauvegarder les messages
+    const updatedMessages = [...messages, userMessage];
+    await saveChatMessages(updatedMessages);
     
     // Extraire les informations du profil depuis la réponse
     const profileUpdates = extractProfileInfo(answer);
@@ -568,6 +562,9 @@ export default function Chat() {
 
     const userMsg: Message = { id: Date.now().toString(), text: content, sender: "user" };
     setMessages((prev) => [...prev, userMsg]);
+    // Sauvegarder les messages
+    const updatedMessages = [...messages, userMsg];
+    await saveChatMessages(updatedMessages);
     setInput("");
     setLoading(true);
     setShowSaveButtons(false); // Masquer les boutons lors d'un nouveau message
@@ -767,15 +764,16 @@ export default function Chat() {
 
       // Streaming artificiel
       const messageId = (Date.now() + 1).toString();
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: messageId,
-          text: "",
-          sender: "ai",
-          originalText: replyText, // Stocker le texte original avec balises JSON
-        },
-      ]);
+      const aiMessage = {
+        id: messageId,
+        text: "",
+        sender: "ai" as const,
+        originalText: replyText, // Stocker le texte original avec balises JSON
+      };
+      setMessages((prev) => [...prev, aiMessage]);
+      // Sauvegarder les messages
+      const updatedMessages = [...messages, aiMessage];
+      await saveChatMessages(updatedMessages);
 
       setIsTyping(true);
 
@@ -786,11 +784,14 @@ export default function Chat() {
       for (let i = 0; i < words.length; i++) {
         currentText += (i > 0 ? " " : "") + words[i];
         
-        setMessages((prev) =>
-          prev.map((msg) =>
+        setMessages((prev) => {
+          const updated = prev.map((msg) =>
             msg.id === messageId ? { ...msg, text: currentText } : msg
-          )
-        );
+          );
+          // Sauvegarder les messages mis à jour
+          saveChatMessages(updated);
+          return updated;
+        });
         
         // Pause variable selon le type de contenu
         const word = words[i];

@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { addPlan } from './plans';
 import { loadProfile, UserProfile } from './profile';
 import { addShoppingItem, extractIngredientsFromAIResponse } from './shopping';
+import { storageAdapter } from './storage-adapter-simple';
 
 export interface DayPlan {
   id: string;
@@ -26,7 +27,7 @@ export interface DayPlan {
   createdAt: string;
 }
 
-const DAY_PLANS_KEY = 'dayPlans';
+const DAY_PLANS_KEY = 'the_sport_day_plans_v1';
 
 // 🚀 Générer un plan de journée complet
 export async function generateDayPlan(): Promise<DayPlan> {
@@ -163,21 +164,36 @@ export async function saveDayPlan(dayPlan: DayPlan): Promise<void> {
   try {
     const existingPlans = await loadDayPlans();
     const updatedPlans = [dayPlan, ...existingPlans];
-    await AsyncStorage.setItem(DAY_PLANS_KEY, JSON.stringify(updatedPlans));
+    await storageAdapter.save(DAY_PLANS_KEY, updatedPlans);
   } catch (error) {
     console.error('Erreur sauvegarde plan jour:', error);
-    throw new Error('Impossible de sauvegarder le plan de journée');
+    // Fallback vers AsyncStorage
+    try {
+      const existingPlans = await loadDayPlans();
+      const updatedPlans = [dayPlan, ...existingPlans];
+      await AsyncStorage.setItem(DAY_PLANS_KEY, JSON.stringify(updatedPlans));
+    } catch (e) {
+      console.error("Erreur en sauvegardant le plan de journée:", e);
+      throw new Error('Impossible de sauvegarder le plan de journée');
+    }
   }
 }
 
 // 📖 Charger tous les plans de journée
 export async function loadDayPlans(): Promise<DayPlan[]> {
   try {
-    const data = await AsyncStorage.getItem(DAY_PLANS_KEY);
-    return data ? JSON.parse(data) : [];
+    const data = await storageAdapter.load(DAY_PLANS_KEY);
+    return data || [];
   } catch (error) {
     console.error('Erreur chargement plans jour:', error);
-    return [];
+    // Fallback vers AsyncStorage
+    try {
+      const data = await AsyncStorage.getItem(DAY_PLANS_KEY);
+      return data ? JSON.parse(data) : [];
+    } catch (e) {
+      console.error("Erreur en chargeant les plans de jour:", e);
+      return [];
+    }
   }
 }
 
@@ -186,10 +202,18 @@ export async function deleteDayPlan(dayPlanId: string): Promise<void> {
   try {
     const existingPlans = await loadDayPlans();
     const updatedPlans = existingPlans.filter(plan => plan.id !== dayPlanId);
-    await AsyncStorage.setItem(DAY_PLANS_KEY, JSON.stringify(updatedPlans));
+    await storageAdapter.save(DAY_PLANS_KEY, updatedPlans);
   } catch (error) {
     console.error('Erreur suppression plan jour:', error);
-    throw new Error('Impossible de supprimer le plan de journée');
+    // Fallback vers AsyncStorage
+    try {
+      const existingPlans = await loadDayPlans();
+      const updatedPlans = existingPlans.filter(plan => plan.id !== dayPlanId);
+      await AsyncStorage.setItem(DAY_PLANS_KEY, JSON.stringify(updatedPlans));
+    } catch (e) {
+      console.error("Erreur en supprimant le plan de journée:", e);
+      throw new Error('Impossible de supprimer le plan de journée');
+    }
   }
 }
 

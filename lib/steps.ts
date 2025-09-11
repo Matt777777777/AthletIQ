@@ -1,6 +1,7 @@
 // lib/steps.ts
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Pedometer } from "expo-sensors";
+import { storageAdapter } from "./storage-adapter-simple";
 
 const DAILY_STEPS_KEY = "the_sport_daily_steps_v1";
 
@@ -21,12 +22,19 @@ export function getDailyStepsTarget(): number {
  */
 export async function loadDailySteps(): Promise<DailySteps> {
   try {
-    const raw = await AsyncStorage.getItem(DAILY_STEPS_KEY);
-    if (!raw) return { steps: 0, lastUpdated: new Date().toISOString() };
-    return JSON.parse(raw) as DailySteps;
-  } catch (e) {
-    console.error("Erreur en chargeant les pas quotidiens:", e);
-    return { steps: 0, lastUpdated: new Date().toISOString() };
+    const data = await storageAdapter.load(DAILY_STEPS_KEY);
+    return data || { steps: 0, lastUpdated: new Date().toISOString() };
+  } catch (error) {
+    console.error('Erreur chargement pas de marche:', error);
+    // Fallback vers AsyncStorage
+    try {
+      const raw = await AsyncStorage.getItem(DAILY_STEPS_KEY);
+      if (!raw) return { steps: 0, lastUpdated: new Date().toISOString() };
+      return JSON.parse(raw) as DailySteps;
+    } catch (e) {
+      console.error("Erreur en chargeant les pas quotidiens:", e);
+      return { steps: 0, lastUpdated: new Date().toISOString() };
+    }
   }
 }
 
@@ -35,9 +43,15 @@ export async function loadDailySteps(): Promise<DailySteps> {
  */
 export async function saveDailySteps(steps: DailySteps): Promise<void> {
   try {
-    await AsyncStorage.setItem(DAILY_STEPS_KEY, JSON.stringify(steps));
-  } catch (e) {
-    console.error("Erreur en sauvegardant les pas quotidiens:", e);
+    await storageAdapter.save(DAILY_STEPS_KEY, steps);
+  } catch (error) {
+    console.error('Erreur sauvegarde pas de marche:', error);
+    // Fallback vers AsyncStorage
+    try {
+      await AsyncStorage.setItem(DAILY_STEPS_KEY, JSON.stringify(steps));
+    } catch (e) {
+      console.error("Erreur en sauvegardant les pas quotidiens:", e);
+    }
   }
 }
 
