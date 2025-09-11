@@ -1,7 +1,7 @@
 // lib/steps.ts
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Pedometer } from "expo-sensors";
-import { storageAdapter } from "./storage-adapter-simple";
+import { supabaseStorageAdapter as storageAdapter } from './storage-adapter-supabase';
 
 const DAILY_STEPS_KEY = "the_sport_daily_steps_v1";
 

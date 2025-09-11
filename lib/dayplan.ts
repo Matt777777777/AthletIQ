@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { addPlan } from './plans';
 import { loadProfile, UserProfile } from './profile';
 import { addShoppingItem, extractIngredientsFromAIResponse } from './shopping';
-import { storageAdapter } from './storage-adapter-simple';
+import { supabaseStorageAdapter as storageAdapter } from './storage-adapter-supabase';
 
 export interface DayPlan {
   id: string;

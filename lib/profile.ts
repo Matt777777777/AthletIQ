@@ -1,6 +1,6 @@
 // lib/profile.ts
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { storageAdapter } from "./storage-adapter-simple";
+import { supabaseStorageAdapter as storageAdapter } from './storage-adapter-supabase';
 
 export type UserProfile = {
   goal: string;     // Exemple : "Perdre du poids", "Prendre du muscle", "Être en forme"

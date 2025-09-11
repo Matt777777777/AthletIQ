@@ -1,6 +1,6 @@
 // lib/shopping.ts
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { storageAdapter } from "./storage-adapter-simple";
+import { supabaseStorageAdapter as storageAdapter } from './storage-adapter-supabase';
 
 export type ShoppingItem = {
   id: string;

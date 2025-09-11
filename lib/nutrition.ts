@@ -1,7 +1,7 @@
 // lib/nutrition.ts
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { UserProfile } from "./profile";
-import { storageAdapter } from "./storage-adapter-simple";
+import { supabaseStorageAdapter as storageAdapter } from './storage-adapter-supabase';
 
 const DAILY_INTAKE_KEY = "the_sport_daily_intake_v1";
 
