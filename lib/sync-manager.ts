@@ -1,8 +1,8 @@
 // lib/sync-manager.ts
 // Gestionnaire de synchronisation avancé pour Supabase
 
-import { getCurrentUserId, getSupabaseClient } from './supabase';
 import { supabaseStorageAdapter } from './storage-adapter-supabase';
+import { getCurrentUserId, getSupabaseClient } from './supabase';
 
 export type SyncStatus = 'idle' | 'syncing' | 'error' | 'success';
 export type ConflictResolution = 'local' | 'remote' | 'merge';
