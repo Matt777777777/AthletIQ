@@ -5,9 +5,18 @@ import { getCurrentUserId, getSupabaseClient, isSupabaseConnected } from './supa
 
 export type StorageMode = 'async' | 'supabase' | 'hybrid';
 
+export type StorageError = {
+  type: 'NETWORK' | 'AUTH' | 'PERMISSION' | 'DATA' | 'UNKNOWN';
+  message: string;
+  originalError?: any;
+  key?: string;
+};
+
 class StorageAdapter {
   private mode: StorageMode = 'async';
   private initialized = false;
+  private cache = new Map<string, any>(); // Cache pour éviter les appels répétés
+  private lastSync = new Map<string, number>(); // Timestamp de la dernière sync
 
   // Initialisation du mode de stockage
   async initialize(): Promise<void> {
@@ -39,9 +48,57 @@ class StorageAdapter {
     return this.mode;
   }
 
+  // Vider le cache
+  clearCache(): void {
+    this.cache.clear();
+    this.lastSync.clear();
+    console.log('🧹 Cache vidé');
+  }
+
+  // Obtenir les statistiques du cache
+  getCacheStats(): { size: number; keys: string[] } {
+    return {
+      size: this.cache.size,
+      keys: Array.from(this.cache.keys())
+    };
+  }
+
+  // Créer une erreur typée
+  private createStorageError(
+    type: StorageError['type'],
+    message: string,
+    originalError?: any,
+    key?: string
+  ): StorageError {
+    return {
+      type,
+      message,
+      originalError,
+      key
+    };
+  }
+
+  // Gérer les erreurs Supabase
+  private handleSupabaseError(error: any, key: string): StorageError {
+    if (error?.code === 'PGRST301' || error?.message?.includes('network')) {
+      return this.createStorageError('NETWORK', 'Erreur de connexion réseau', error, key);
+    }
+    if (error?.code === 'PGRST301' || error?.message?.includes('auth')) {
+      return this.createStorageError('AUTH', 'Erreur d\'authentification', error, key);
+    }
+    if (error?.code === 'PGRST301' || error?.message?.includes('permission')) {
+      return this.createStorageError('PERMISSION', 'Erreur de permissions', error, key);
+    }
+    return this.createStorageError('UNKNOWN', 'Erreur Supabase inconnue', error, key);
+  }
+
   // Sauvegarder avec fallback automatique
   async save(key: string, data: any): Promise<void> {
     await this.initialize();
+
+    // Mettre à jour le cache
+    this.cache.set(key, data);
+    this.lastSync.set(key, Date.now());
 
     try {
       if (this.mode === 'hybrid') {
@@ -71,6 +128,17 @@ class StorageAdapter {
   async load(key: string): Promise<any> {
     await this.initialize();
 
+    // Vérifier le cache d'abord (évite les appels répétés)
+    if (this.cache.has(key)) {
+      const lastSyncTime = this.lastSync.get(key) || 0;
+      const now = Date.now();
+      // Cache valide pendant 5 minutes
+      if (now - lastSyncTime < 5 * 60 * 1000) {
+        console.log(`📦 Données chargées depuis le cache: ${key}`);
+        return this.cache.get(key);
+      }
+    }
+
     try {
       if (this.mode === 'hybrid') {
         // Essayer Supabase d'abord
@@ -78,6 +146,9 @@ class StorageAdapter {
           const data = await this.loadFromSupabase(key);
           if (data) {
             console.log(`✅ Données chargées (Supabase): ${key}`);
+            // Mettre à jour le cache
+            this.cache.set(key, data);
+            this.lastSync.set(key, Date.now());
             return data;
           }
         } catch (supabaseError) {
@@ -87,15 +158,23 @@ class StorageAdapter {
         // Fallback vers AsyncStorage
         const localData = await AsyncStorage.getItem(key);
         if (localData) {
+          const data = JSON.parse(localData);
           console.log(`✅ Données chargées (Local): ${key}`);
-          return JSON.parse(localData);
+          // Mettre à jour le cache
+          this.cache.set(key, data);
+          this.lastSync.set(key, Date.now());
+          return data;
         }
       } else {
         // Mode AsyncStorage uniquement
         const localData = await AsyncStorage.getItem(key);
         if (localData) {
+          const data = JSON.parse(localData);
           console.log(`✅ Données chargées (Local): ${key}`);
-          return JSON.parse(localData);
+          // Mettre à jour le cache
+          this.cache.set(key, data);
+          this.lastSync.set(key, Date.now());
+          return data;
         }
       }
 

@@ -1,8 +1,7 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useEffect, useRef, useState } from "react";
 import { FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from "react-native";
-import { addChatMessage, checkAndResetDailyChat, clearChatMessages, loadChatMessages, Message, saveChatMessages, updateChatMessage } from "../lib/chat";
+import { checkAndResetDailyChat, loadChatMessages, Message, saveChatMessages } from "../lib/chat";
 import { estimateKcalTarget } from "../lib/nutrition";
 import { loadProfile, saveDailyMeal, savePlan, saveProfile, UserProfile } from "../lib/profile";
 import { addShoppingItem, extractIngredientsFromAIResponse } from "../lib/shopping";
