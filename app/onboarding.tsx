@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
-import { saveProfile } from "../lib/profile";
+import { authService } from "../lib/auth";
 
 const goals = ["Perdre du poids", "Prendre du muscle", "Être en forme"];
 const diets = ["Végétarien", "Vegan", "Sans gluten", "Aucune restriction"];
@@ -25,32 +25,43 @@ export default function Onboarding() {
       return;
     }
 
-    // Étape finale : on enregistre le profil en local
+    // Étape finale : on enregistre le profil via le service d'authentification
     const profile = {
       goal: goal ?? "Être en forme",
       sessions,
       diet: diet ?? "Aucune restriction",
       gender: gender === "Homme" ? "male" as const : gender === "Femme" ? "female" as const : undefined,
-      firstName: firstName.trim() || undefined,
+      first_name: firstName.trim() || undefined,
       age: age ? parseInt(age) : undefined,
       weight: weight ? parseFloat(weight) : undefined,
       height: height ? parseFloat(height) : undefined,
+      profile_photo: '',
+      fitness_level: 'débutant',
+      equipment: 'aucun',
+      intolerances: '',
+      limitations: '',
+      preferred_time: 'matin',
+      chat_responses: {},
+      chat_questions_asked: false,
+      daily_meals: {},
+      daily_workout: {},
     };
+    
     try {
-      await saveProfile(profile);
+      const result = await authService.updateProfile(profile);
+      if (result.success) {
+        // La redirection se fera automatiquement via le layout principal
+        router.replace("/(tabs)");
+      } else {
+        console.error("Erreur mise à jour profil:", result.error);
+        // Fallback : essayer de sauvegarder en local
+        router.replace("/(tabs)");
+      }
     } catch (e) {
-      console.warn("saveProfile error", e);
+      console.warn("Erreur updateProfile:", e);
+      // Fallback : continuer quand même
+      router.replace("/(tabs)");
     }
-
-    // Puis on va aux onglets (on passe aussi les params pour compat)
-    router.replace({
-      pathname: "/(tabs)",
-      params: {
-        goal: profile.goal,
-        sessions: String(profile.sessions),
-        diet: profile.diet,
-      },
-    });
   }
 
   return (

@@ -106,3 +106,4 @@ export async function clearChatMessages(): Promise<void> {
     console.error('Erreur suppression messages chat:', error);
   }
 }
+

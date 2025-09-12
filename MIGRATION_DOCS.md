@@ -194,3 +194,4 @@ console.log('Statistiques cache:', storageAdapter.getCacheStats());
 ---
 
 **Migration Supabase TheSport** - Documentation complète de la migration vers Supabase avec système de fallback robuste.
+

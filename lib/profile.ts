@@ -8,22 +8,22 @@ export type UserProfile = {
   diet: string;     // Exemple : "Végétarien", "Vegan", "Sans gluten", "Aucune restriction"
   
   // Informations personnelles
-  firstName?: string;    // Prénom de l'utilisateur
+  first_name?: string;    // Prénom de l'utilisateur (compatible Supabase)
   age?: number;          // Âge en années
   weight?: number;       // Poids en kg
   height?: number;       // Taille en cm
   gender?: 'male' | 'female'; // Sexe de l'utilisateur
-  profilePhoto?: string; // URI de la photo de profil
+  profile_photo?: string; // URI de la photo de profil (compatible Supabase)
   
   // Questions complémentaires du chat IA (réponses exactes)
-  fitnessLevel?: "Débutant" | "Intermédiaire" | "Avancé";
-  equipment?: "Aucun" | "Basique" | "Complet";
+  fitness_level?: string; // Compatible Supabase
+  equipment?: string; // Compatible Supabase
   intolerances?: string; // Ex: "Lactose, gluten" ou "Aucune"
   limitations?: string;  // Ex: "Problèmes de dos" ou "Aucune"
-  preferredTime?: "Matin" | "Midi" | "Soir" | "Flexible";
+  preferred_time?: string; // Compatible Supabase
   
   // Réponses exactes aux questions du chat (mot pour mot)
-  chatResponses?: {
+  chat_responses?: {
     fitnessLevel?: string;    // Réponse exacte à "Quel est ton niveau de sport actuel ?"
     equipment?: string;       // Réponse exacte à "Quel matériel de sport as-tu à disposition ?"
     intolerances?: string;    // Réponse exacte à "As-tu des intolérances alimentaires ou des allergies ?"
@@ -32,10 +32,10 @@ export type UserProfile = {
   };
   
   // Flag pour indiquer si les questions du chat ont déjà été posées
-  chatQuestionsAsked?: boolean;
+  chat_questions_asked?: boolean;
   
   // Plans sauvegardés
-  savedPlans?: {
+  saved_plans?: {
     workouts: Array<{
       id: string;
       title: string;
@@ -51,7 +51,7 @@ export type UserProfile = {
   };
 
   // Repas quotidiens
-  dailyMeals?: {
+  daily_meals?: {
     breakfast?: {
       id: string;
       title: string;
@@ -83,7 +83,7 @@ export type UserProfile = {
   };
 
   // Séance du jour (compatibilité)
-  dailyWorkout?: {
+  daily_workout?: {
     id: string;
     title: string;
     content: string;
@@ -94,7 +94,7 @@ export type UserProfile = {
   } | null;
   
   // Séances du jour (nouveau format - support 2 séances)
-  dailyWorkouts?: Array<{
+  daily_workouts?: Array<{
     id: string;
     title: string;
     content: string;
@@ -106,7 +106,7 @@ export type UserProfile = {
   }>;
 
   // Historique des journées
-  dailyHistory?: {
+  daily_history?: {
     [date: string]: { // Format: "YYYY-MM-DD"
       date: string;
       nutrition: {
@@ -133,6 +133,28 @@ export type UserProfile = {
       };
     };
   };
+};
+
+// Type Profile compatible avec l'authentification Supabase
+export type Profile = {
+  goal: string;
+  sessions: number;
+  diet: string;
+  first_name?: string;
+  age?: number;
+  weight?: number;
+  height?: number;
+  gender?: 'male' | 'female';
+  profile_photo?: string;
+  fitness_level?: string;
+  equipment?: string;
+  intolerances?: string;
+  limitations?: string;
+  preferred_time?: string;
+  chat_responses?: any;
+  chat_questions_asked?: boolean;
+  daily_meals?: any;
+  daily_workout?: any;
 };
 
 const KEY = "the_sport_profile_v1";
@@ -202,7 +224,7 @@ export async function savePlan(type: 'workout' | 'meal', title: string, content:
     const profile = await loadProfile();
     if (!profile) return false;
 
-    const savedPlans = profile.savedPlans || { workouts: [], meals: [] };
+    const savedPlans = profile.saved_plans || { workouts: [], meals: [] };
     
     const newPlan = {
       id: Date.now().toString(),
@@ -217,7 +239,7 @@ export async function savePlan(type: 'workout' | 'meal', title: string, content:
       savedPlans.meals.push(newPlan);
     }
 
-    const updatedProfile = { ...profile, savedPlans };
+    const updatedProfile = { ...profile, saved_plans: savedPlans };
     await saveProfile(updatedProfile);
     return true;
   } catch (e) {
@@ -237,7 +259,7 @@ export async function deletePlan(type: 'workout' | 'meal', planId: string): Prom
       return false;
     }
 
-    const savedPlans = profile.savedPlans || { workouts: [], meals: [] };
+    const savedPlans = profile.saved_plans || { workouts: [], meals: [] };
     
     if (type === 'workout') {
       const beforeCount = savedPlans.workouts.length;
@@ -251,7 +273,7 @@ export async function deletePlan(type: 'workout' | 'meal', planId: string): Prom
       console.log(`✅ Meal deletion: ${beforeCount} → ${afterCount} meals`);
     }
 
-    const updatedProfile = { ...profile, savedPlans };
+    const updatedProfile = { ...profile, saved_plans: savedPlans };
     await saveProfile(updatedProfile);
     console.log(`✅ deletePlan completed successfully for ${type}: ${planId}`);
     return true;
@@ -278,9 +300,9 @@ export async function saveDailyMeal(mealType: 'breakfast' | 'lunch' | 'snack' | 
       return false;
     }
 
-    // Initialiser dailyMeals si nécessaire
-    if (!profile.dailyMeals) {
-      profile.dailyMeals = {
+    // Initialiser daily_meals si nécessaire
+    if (!profile.daily_meals) {
+      profile.daily_meals = {
         breakfast: null,
         lunch: null,
         snack: null,
@@ -289,7 +311,7 @@ export async function saveDailyMeal(mealType: 'breakfast' | 'lunch' | 'snack' | 
     }
 
     // Sauvegarder le repas
-    profile.dailyMeals[mealType] = meal;
+    profile.daily_meals[mealType] = meal;
     
     await saveProfile(profile);
     console.log(`✅ Daily meal saved: ${mealType} - ${meal.title}`);
@@ -311,13 +333,13 @@ export async function deleteDailyMeal(mealType: 'breakfast' | 'lunch' | 'snack' 
       return false;
     }
 
-    if (!profile.dailyMeals) {
+    if (!profile.daily_meals) {
       console.log(`❌ No daily meals found`);
       return false;
     }
 
     // Supprimer le repas
-    profile.dailyMeals[mealType] = null;
+    profile.daily_meals[mealType] = null;
     
     await saveProfile(profile);
     console.log(`✅ Daily meal deleted: ${mealType}`);
@@ -345,13 +367,13 @@ export async function saveDailyHistory(dayData: {
     const profile = await loadProfile();
     if (!profile) return false;
 
-    // Initialiser dailyHistory si nécessaire
-    if (!profile.dailyHistory) {
-      profile.dailyHistory = {};
+    // Initialiser daily_history si nécessaire
+    if (!profile.daily_history) {
+      profile.daily_history = {};
     }
 
     // Sauvegarder les données du jour
-    profile.dailyHistory[dayData.date] = dayData;
+    profile.daily_history[dayData.date] = dayData;
     
     await saveProfile(profile);
     console.log(`✅ Daily history saved for ${dayData.date}`);
@@ -363,12 +385,12 @@ export async function saveDailyHistory(dayData: {
 }
 
 // Charger l'historique d'une date spécifique
-export async function loadDailyHistory(date: string): Promise<NonNullable<UserProfile['dailyHistory']>[string] | null> {
+export async function loadDailyHistory(date: string): Promise<NonNullable<UserProfile['daily_history']>[string] | null> {
   try {
     const profile = await loadProfile();
-    if (!profile || !profile.dailyHistory) return null;
+    if (!profile || !profile.daily_history) return null;
     
-    return profile.dailyHistory[date] || null;
+    return profile.daily_history[date] || null;
   } catch (e) {
     console.error("Erreur en chargeant l'historique quotidien:", e);
     return null;
@@ -376,21 +398,21 @@ export async function loadDailyHistory(date: string): Promise<NonNullable<UserPr
 }
 
 // Charger l'historique des 30 derniers jours
-export async function loadRecentHistory(days: number = 30): Promise<Array<NonNullable<UserProfile['dailyHistory']>[string]>> {
+export async function loadRecentHistory(days: number = 30): Promise<Array<NonNullable<UserProfile['daily_history']>[string]>> {
   try {
     const profile = await loadProfile();
-    if (!profile || !profile.dailyHistory) return [];
+    if (!profile || !profile.daily_history) return [];
 
     const today = new Date();
-    const history: Array<NonNullable<UserProfile['dailyHistory']>[string]> = [];
+    const history: Array<NonNullable<UserProfile['daily_history']>[string]> = [];
 
     for (let i = 0; i < days; i++) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
       const dateString = date.toISOString().split('T')[0];
       
-      if (profile.dailyHistory[dateString]) {
-        history.push(profile.dailyHistory[dateString]);
+      if (profile.daily_history[dateString]) {
+        history.push(profile.daily_history[dateString]);
       }
     }
 

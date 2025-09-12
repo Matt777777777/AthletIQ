@@ -1,41 +1,65 @@
 import { Stack, useRouter, useSegments } from "expo-router";
-import { useEffect } from "react";
-import { loadProfile } from "../lib/profile";
+import { useEffect, useState } from "react";
+import { authService, AuthState } from "../lib/auth";
 
 export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
+  const [authState, setAuthState] = useState<AuthState>({
+    user: null,
+    loading: true,
+    error: null,
+  });
 
   useEffect(() => {
-    const checkOnboarding = async () => {
-      try {
-        const profile = await loadProfile();
-        
-        // Si pas de profil, rediriger vers l'onboarding
-        if (!profile) {
-          router.replace("/onboarding");
-          return;
-        }
+    // S'abonner aux changements d'état d'authentification
+    const unsubscribe = authService.subscribe((state) => {
+      setAuthState(state);
+    });
 
-        // Si on est sur l'onboarding mais qu'on a déjà un profil, rediriger vers les tabs
-        if (segments[0] === "onboarding") {
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const handleNavigation = () => {
+      // Si on est en train de charger, ne rien faire
+      if (authState.loading) {
+        return;
+      }
+
+      // Si pas d'utilisateur connecté, rediriger vers l'authentification
+      if (!authState.user) {
+        if (segments[0] !== "auth") {
+          router.replace("/auth");
+        }
+        return;
+      }
+
+      // Si utilisateur connecté mais pas de profil complet, rediriger vers l'onboarding
+      if (authState.user && !authState.user.profile?.first_name) {
+        if (segments[0] !== "onboarding") {
+          router.replace("/onboarding");
+        }
+        return;
+      }
+
+      // Si utilisateur connecté avec profil complet
+      if (authState.user && authState.user.profile?.first_name) {
+        // Si on est sur auth ou onboarding, rediriger vers les tabs
+        if (segments[0] === "auth" || segments[0] === "onboarding") {
           router.replace("/(tabs)");
           return;
         }
 
-        // Si on est sur la racine et qu'on a un profil, rediriger vers les tabs
+        // Si on est sur la racine, rediriger vers les tabs
         if (segments.length === 0) {
           router.replace("/(tabs)");
         }
-      } catch (error) {
-        console.error("Erreur lors de la vérification de l'onboarding:", error);
-        // En cas d'erreur, rediriger vers l'onboarding par sécurité
-        router.replace("/onboarding");
       }
     };
 
-    checkOnboarding();
-  }, [segments]);
+    handleNavigation();
+  }, [authState, segments, router]);
 
   return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#000" } }} />;
 }

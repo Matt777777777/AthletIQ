@@ -353,10 +353,10 @@ export default function Chat() {
         // Initialiser les messages selon le profil
         if (loadedProfile) {
           // Vérifier si on doit poser les questions (première fois seulement)
-          const shouldAskQuestions = !loadedProfile.chatQuestionsAsked;
+          const shouldAskQuestions = !loadedProfile.chat_questions_asked;
           
           console.log("Profil chargé:", loadedProfile);
-          console.log("Questions déjà posées:", loadedProfile.chatQuestionsAsked);
+          console.log("Questions déjà posées:", loadedProfile.chat_questions_asked);
           console.log("Doit poser les questions:", shouldAskQuestions);
           
           if (shouldAskQuestions) {
@@ -435,9 +435,9 @@ export default function Chat() {
     }, [])
   );
 
-  // Surveiller les changements de chatQuestionsAsked pour redémarrer l'onboarding
+  // Surveiller les changements de chat_questions_asked pour redémarrer l'onboarding
   useEffect(() => {
-    if (profile && !profile.chatQuestionsAsked && !isAskingProfileQuestions && messages.length === 0) {
+    if (profile && !profile.chat_questions_asked && !isAskingProfileQuestions && messages.length === 0) {
       console.log("Redémarrage de l'onboarding détecté");
       setMessages([
         {
@@ -454,7 +454,7 @@ export default function Chat() {
       setIsAskingProfileQuestions(true);
       setCurrentQuestionIndex(0);
     }
-  }, [profile?.chatQuestionsAsked]);
+  }, [profile?.chat_questions_asked]);
 
   // Fonction pour traiter une réponse et mettre à jour le profil
   const handleProfileAnswer = async (answer: string) => {
@@ -481,7 +481,7 @@ export default function Chat() {
     const currentQuestionKey = questionKeys[currentQuestionIndex];
     
     // Créer ou mettre à jour les réponses exactes
-    const currentChatResponses = profile.chatResponses || {};
+    const currentChatResponses = profile.chat_responses || {};
     const updatedChatResponses = {
       ...currentChatResponses,
       [currentQuestionKey]: answer
@@ -494,7 +494,7 @@ export default function Chat() {
       const updatedProfile = { 
         ...profile, 
         ...profileUpdates,
-        chatResponses: updatedChatResponses
+        chat_responses: updatedChatResponses
       };
       await saveProfile(updatedProfile);
       setProfile(updatedProfile);
@@ -527,8 +527,8 @@ export default function Chat() {
           const finalProfile = { 
             ...profile, 
             ...profileUpdates,
-            chatResponses: updatedChatResponses,
-            chatQuestionsAsked: true 
+            chat_responses: updatedChatResponses,
+            chat_questions_asked: true 
           };
           console.log("🔍 Sauvegarde du profil final:", finalProfile);
           await saveProfile(finalProfile);
@@ -922,8 +922,9 @@ export default function Chat() {
               </Text>
               </View>
               
-              {/* Boutons de démarrage - affichés après le message d'accueil */}
-              {item.id === "welcome" && profile && profile.chatQuestionsAsked && !isAskingProfileQuestions && (
+              {/* Boutons de démarrage - affichés après le message d'accueil ou de completion */}
+              {((item.id === "welcome" && profile && profile.chat_questions_asked && !isAskingProfileQuestions) || 
+                (item.id === "completion" && profile && profile.chat_questions_asked)) && (
                 <View style={{ padding: 16, alignItems: "center" }}>
                   <View style={{ flexDirection: "row", gap: 12, width: "100%" }}>
                     <Pressable

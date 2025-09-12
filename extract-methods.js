@@ -305,3 +305,4 @@ export const supabaseStorageAdapter = new SupabaseStorageAdapter();
 } else {
   console.error('❌ Impossible de trouver les méthodes spécifiques');
 }
+

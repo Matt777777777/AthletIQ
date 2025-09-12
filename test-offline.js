@@ -50,3 +50,4 @@ console.log('  - Persistance locale robuste');
 
 console.log('\n🎉 Tests de mode hors ligne terminés !');
 console.log('✅ L\'application est prête pour un usage hors ligne');
+

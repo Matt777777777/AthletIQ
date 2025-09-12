@@ -154,3 +154,4 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
 **🎉 La Phase 1 de la migration Supabase est terminée avec succès !**
 
 L'application continue de fonctionner normalement avec AsyncStorage, et Supabase est prêt à être utilisé dès que la configuration sera complétée.
+

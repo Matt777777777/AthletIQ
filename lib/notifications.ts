@@ -1,11 +1,11 @@
 // lib/notifications.ts
 // Système de notifications push pour TheSport
 
-import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { getCurrentUserId, getSupabaseClient } from './supabase';
 import { analytics } from './analytics';
+import { getCurrentUserId, getSupabaseClient } from './supabase';
 
 export type NotificationData = {
   id: string;
@@ -363,3 +363,4 @@ class NotificationManager {
 
 // Instance singleton
 export const notificationManager = new NotificationManager();
+

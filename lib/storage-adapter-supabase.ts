@@ -148,7 +148,7 @@ class SupabaseStorageAdapter {
 
     const tableMapping: { [key: string]: string } = {
       'the_sport_profile_v1': 'profiles',
-      'the_sport_saved_plans_v1': 'saved_plans',
+      'the_sport_saved_plans_v1': 'profiles', // Les plans sont stockés dans le profil
       'the_sport_shopping_list_v1': 'shopping_items',
       'the_sport_daily_intake_v1': 'daily_intake',
       'the_sport_daily_steps_v1': 'daily_steps',
@@ -164,10 +164,13 @@ class SupabaseStorageAdapter {
     // Logique de sauvegarde spécifique par table
     switch (tableName) {
       case 'profiles':
-        await this.saveProfileToSupabase(userId, data);
-        break;
-      case 'saved_plans':
-        await this.savePlansToSupabase(userId, data);
+        if (key === 'the_sport_saved_plans_v1') {
+          // Si c'est une sauvegarde de plans, les sauvegarder dans la table saved_plans
+          await this.savePlansToSupabase(userId, data);
+        } else {
+          // Sinon, sauvegarder le profil normalement
+          await this.saveProfileToSupabase(userId, data);
+        }
         break;
       case 'shopping_items':
         await this.saveShoppingItemsToSupabase(userId, data);
@@ -205,7 +208,7 @@ class SupabaseStorageAdapter {
 
     const tableMapping: { [key: string]: string } = {
       'the_sport_profile_v1': 'profiles',
-      'the_sport_saved_plans_v1': 'saved_plans',
+      'the_sport_saved_plans_v1': 'profiles', // Les plans sont stockés dans le profil
       'the_sport_shopping_list_v1': 'shopping_items',
       'the_sport_daily_intake_v1': 'daily_intake',
       'the_sport_daily_steps_v1': 'daily_steps',
@@ -221,9 +224,13 @@ class SupabaseStorageAdapter {
     // Logique de chargement spécifique par table
     switch (tableName) {
       case 'profiles':
-        return await this.loadProfileFromSupabase(userId);
-      case 'saved_plans':
-        return await this.loadPlansFromSupabase(userId);
+        if (key === 'the_sport_saved_plans_v1') {
+          // Si c'est un chargement de plans, les charger depuis la table saved_plans
+          return await this.loadPlansFromSupabase(userId);
+        } else {
+          // Sinon, charger le profil normalement
+          return await this.loadProfileFromSupabase(userId);
+        }
       case 'shopping_items':
         return await this.loadShoppingItemsFromSupabase(userId);
       case 'daily_intake':
@@ -254,7 +261,7 @@ class SupabaseStorageAdapter {
 
     const tableMapping: { [key: string]: string } = {
       'the_sport_profile_v1': 'profiles',
-      'the_sport_saved_plans_v1': 'saved_plans',
+      'the_sport_saved_plans_v1': 'saved_plans', // Pour la suppression, on supprime de la table saved_plans
       'the_sport_shopping_list_v1': 'shopping_items',
       'the_sport_daily_intake_v1': 'daily_intake',
       'the_sport_daily_steps_v1': 'daily_steps',
@@ -279,32 +286,59 @@ class SupabaseStorageAdapter {
 // Méthodes spécifiques pour le profil
   private async saveProfileToSupabase(userId: string, profile: any): Promise<void> {
     const client = getSupabaseClient();
-    const { error } = await client
+    
+    // Vérifier si le profil existe déjà
+    const { data: existingProfile, error: selectError } = await client
       .from('profiles')
-      .upsert({
-        user_id: userId,
-        goal: profile.goal,
-        sessions: profile.sessions,
-        diet: profile.diet,
-        first_name: profile.firstName,
-        age: profile.age,
-        weight: profile.weight,
-        height: profile.height,
-        gender: profile.gender,
-        profile_photo: profile.profilePhoto,
-        fitness_level: profile.fitnessLevel,
-        equipment: profile.equipment,
-        intolerances: profile.intolerances,
-        limitations: profile.limitations,
-        preferred_time: profile.preferredTime,
-        chat_responses: profile.chatResponses,
-        chat_questions_asked: profile.chatQuestionsAsked,
-        daily_meals: profile.dailyMeals,
-        daily_workout: profile.dailyWorkout,
-        updated_at: new Date().toISOString(),
-      });
+      .select('id')
+      .eq('user_id', userId)
+      .single();
 
-    if (error) throw error;
+    if (selectError && selectError.code !== 'PGRST116') {
+      throw selectError;
+    }
+
+    const profileData = {
+      user_id: userId,
+      goal: profile.goal,
+      sessions: profile.sessions,
+      diet: profile.diet,
+      first_name: profile.first_name || profile.firstName,
+      age: profile.age,
+      weight: profile.weight,
+      height: profile.height,
+      gender: profile.gender,
+      profile_photo: profile.profile_photo || profile.profilePhoto,
+      fitness_level: profile.fitness_level || profile.fitnessLevel,
+      equipment: profile.equipment,
+      intolerances: profile.intolerances,
+      limitations: profile.limitations,
+      preferred_time: profile.preferred_time || profile.preferredTime,
+      chat_responses: profile.chat_responses || profile.chatResponses,
+      chat_questions_asked: profile.chat_questions_asked || profile.chatQuestionsAsked,
+      daily_meals: profile.daily_meals || profile.dailyMeals,
+      daily_workout: profile.daily_workout || profile.dailyWorkout,
+      daily_history: profile.daily_history || profile.dailyHistory,
+      saved_plans: profile.saved_plans || profile.savedPlans,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (existingProfile) {
+      // Mettre à jour le profil existant
+      const { error: updateError } = await client
+        .from('profiles')
+        .update(profileData)
+        .eq('user_id', userId);
+      
+      if (updateError) throw updateError;
+    } else {
+      // Créer un nouveau profil
+      const { error: insertError } = await client
+        .from('profiles')
+        .insert(profileData);
+      
+      if (insertError) throw insertError;
+    }
   }
 
   private async loadProfileFromSupabase(userId: string): Promise<any> {
@@ -323,33 +357,36 @@ class SupabaseStorageAdapter {
       goal: data.goal,
       sessions: data.sessions,
       diet: data.diet,
-      firstName: data.first_name,
+      first_name: data.first_name,
       age: data.age,
       weight: data.weight,
       height: data.height,
       gender: data.gender,
-      profilePhoto: data.profile_photo,
-      fitnessLevel: data.fitness_level,
+      profile_photo: data.profile_photo,
+      fitness_level: data.fitness_level,
       equipment: data.equipment,
       intolerances: data.intolerances,
       limitations: data.limitations,
-      preferredTime: data.preferred_time,
-      chatResponses: data.chat_responses,
-      chatQuestionsAsked: data.chat_questions_asked,
-      dailyMeals: data.daily_meals,
-      dailyWorkout: data.daily_workout,
+      preferred_time: data.preferred_time,
+      chat_responses: data.chat_responses,
+      chat_questions_asked: data.chat_questions_asked,
+      daily_meals: data.daily_meals,
+      daily_workout: data.daily_workout,
+      daily_history: data.daily_history,
+      saved_plans: data.saved_plans,
     };
   }
 
   // Méthodes spécifiques pour les plans
-  private async savePlansToSupabase(userId: string, plans: any[]): Promise<void> {
-    if (!Array.isArray(plans) || plans.length === 0) {
+  private async savePlansToSupabase(userId: string, plans: any): Promise<void> {
+    if (!plans || (!plans.workouts && !plans.meals)) {
       console.log('Aucun plan à sauvegarder');
       return;
     }
 
-    // Supprimer les anciens plans de l'utilisateur
     const client = getSupabaseClient();
+    
+    // Supprimer les anciens plans de l'utilisateur
     const { error: deleteError } = await client
       .from('saved_plans')
       .delete()
@@ -359,21 +396,46 @@ class SupabaseStorageAdapter {
       console.warn('Erreur suppression anciens plans:', deleteError);
     }
 
-    // Insérer les nouveaux plans
-    const plansToInsert = plans.map((plan: any) => ({
-      user_id: userId,
-      type: plan.type,
-      title: plan.title,
-      content: plan.content,
-      created_at: plan.dateISO || new Date().toISOString(),
-    }));
+    // Préparer tous les plans à insérer
+    const plansToInsert: any[] = [];
+
+    // Ajouter les séances de sport
+    if (plans.workouts && Array.isArray(plans.workouts)) {
+      plans.workouts.forEach((workout: any) => {
+        plansToInsert.push({
+          user_id: userId,
+          type: 'workout',
+          title: workout.title,
+          content: workout.content,
+          created_at: workout.date || new Date().toISOString(),
+        });
+      });
+    }
+
+    // Ajouter les repas
+    if (plans.meals && Array.isArray(plans.meals)) {
+      plans.meals.forEach((meal: any) => {
+        plansToInsert.push({
+          user_id: userId,
+          type: 'meal',
+          title: meal.title,
+          content: meal.content,
+          created_at: meal.date || new Date().toISOString(),
+        });
+      });
+    }
+
+    if (plansToInsert.length === 0) {
+      console.log('Aucun plan valide à sauvegarder');
+      return;
+    }
 
     const { error: insertError } = await client
       .from('saved_plans')
       .insert(plansToInsert);
 
     if (insertError) throw insertError;
-    console.log(`✅ ${plans.length} plans sauvegardés dans Supabase`);
+    console.log(`✅ ${plansToInsert.length} plans sauvegardés dans Supabase`);
   }
 
   private async loadPlansFromSupabase(userId: string): Promise<any> {
@@ -385,16 +447,28 @@ class SupabaseStorageAdapter {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    if (!data || data.length === 0) return [];
+    if (!data || data.length === 0) return { workouts: [], meals: [] };
 
-    // Convertir le format Supabase vers le format AsyncStorage
-    return data.map((plan: any) => ({
-      id: plan.id,
-      type: plan.type,
-      title: plan.title,
-      content: plan.content,
-      dateISO: plan.created_at,
-    }));
+    // Séparer les plans par type
+    const workouts: any[] = [];
+    const meals: any[] = [];
+
+    data.forEach((plan: any) => {
+      const planData = {
+        id: plan.id,
+        title: plan.title,
+        content: plan.content,
+        date: plan.created_at,
+      };
+
+      if (plan.type === 'workout') {
+        workouts.push(planData);
+      } else if (plan.type === 'meal') {
+        meals.push(planData);
+      }
+    });
+
+    return { workouts, meals };
   }
 
   // Méthodes spécifiques pour la liste de courses
@@ -469,28 +543,19 @@ class SupabaseStorageAdapter {
     const client = getSupabaseClient();
     const today = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD
 
-    // Supprimer l'ancien apport du jour
-    const { error: deleteError } = await client
+    // Utiliser upsert pour éviter les conflits de contrainte unique
+    const { error: upsertError } = await client
       .from('daily_intake')
-      .delete()
-      .eq('user_id', userId)
-      .eq('date', today);
-
-    if (deleteError) {
-      console.warn('Erreur suppression ancien apport:', deleteError);
-    }
-
-    // Insérer le nouvel apport
-    const { error: insertError } = await client
-      .from('daily_intake')
-      .insert({
+      .upsert({
         user_id: userId,
         date: today,
         kcal: intake.kcal,
         created_at: new Date().toISOString(),
+      }, {
+        onConflict: 'user_id,date'
       });
 
-    if (insertError) throw insertError;
+    if (upsertError) throw upsertError;
     console.log(`✅ Apport nutritionnel sauvegardé dans Supabase: ${intake.kcal} kcal`);
   }
 
@@ -531,29 +596,20 @@ class SupabaseStorageAdapter {
     const client = getSupabaseClient();
     const today = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD
 
-    // Supprimer l'ancien enregistrement du jour
-    const { error: deleteError } = await client
+    // Utiliser upsert pour éviter les conflits de contrainte unique
+    const { error: upsertError } = await client
       .from('daily_steps')
-      .delete()
-      .eq('user_id', userId)
-      .eq('date', today);
-
-    if (deleteError) {
-      console.warn('Erreur suppression anciens pas:', deleteError);
-    }
-
-    // Insérer le nouvel enregistrement
-    const { error: insertError } = await client
-      .from('daily_steps')
-      .insert({
+      .upsert({
         user_id: userId,
         date: today,
         steps: steps.steps,
         last_updated: steps.lastUpdated || new Date().toISOString(),
         created_at: new Date().toISOString(),
+      }, {
+        onConflict: 'user_id,date'
       });
 
-    if (insertError) throw insertError;
+    if (upsertError) throw upsertError;
     console.log(`✅ Pas de marche sauvegardés dans Supabase: ${steps.steps} pas`);
   }
 
@@ -730,3 +786,4 @@ class SupabaseStorageAdapter {
 
 // Instance singleton
 export const supabaseStorageAdapter = new SupabaseStorageAdapter();
+

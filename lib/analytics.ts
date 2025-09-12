@@ -343,3 +343,4 @@ class AnalyticsManager {
 
 // Instance singleton
 export const analytics = new AnalyticsManager();
+

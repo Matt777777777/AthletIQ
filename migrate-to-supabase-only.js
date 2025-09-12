@@ -47,3 +47,4 @@ filesToMigrate.forEach(filePath => {
 
 console.log('\n🎉 Migration terminée !');
 console.log('✅ Tous les services utilisent maintenant Supabase uniquement');
+

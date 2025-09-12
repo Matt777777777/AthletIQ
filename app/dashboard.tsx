@@ -338,8 +338,8 @@ export default function Dashboard() {
       setHasHealthPermissions(permissionsData);
 
       // Charger les séances sauvegardées
-      if (profileData?.savedPlans?.workouts) {
-        const workouts = profileData.savedPlans.workouts.map(workout => ({
+      if (profileData?.saved_plans?.workouts) {
+        const workouts = profileData.saved_plans.workouts.map(workout => ({
           id: workout.id,
           title: workout.title,
           content: workout.content,
@@ -380,12 +380,12 @@ export default function Dashboard() {
       }
       
       // Charger les repas quotidiens depuis le profil
-      if (profileData?.dailyMeals) {
+      if (profileData?.daily_meals) {
         const meals = {
-          breakfast: profileData.dailyMeals.breakfast ? { ...profileData.dailyMeals.breakfast, eaten: profileData.dailyMeals.breakfast.eaten || false } : null,
-          lunch: profileData.dailyMeals.lunch ? { ...profileData.dailyMeals.lunch, eaten: profileData.dailyMeals.lunch.eaten || false } : null,
-          snack: profileData.dailyMeals.snack ? { ...profileData.dailyMeals.snack, eaten: profileData.dailyMeals.snack.eaten || false } : null,
-          dinner: profileData.dailyMeals.dinner ? { ...profileData.dailyMeals.dinner, eaten: profileData.dailyMeals.dinner.eaten || false } : null
+          breakfast: profileData.daily_meals.breakfast ? { ...profileData.daily_meals.breakfast, eaten: profileData.daily_meals.breakfast.eaten || false } : null,
+          lunch: profileData.daily_meals.lunch ? { ...profileData.daily_meals.lunch, eaten: profileData.daily_meals.lunch.eaten || false } : null,
+          snack: profileData.daily_meals.snack ? { ...profileData.daily_meals.snack, eaten: profileData.daily_meals.snack.eaten || false } : null,
+          dinner: profileData.daily_meals.dinner ? { ...profileData.daily_meals.dinner, eaten: profileData.daily_meals.dinner.eaten || false } : null
         };
         setDailyMeals(meals);
 
@@ -404,8 +404,8 @@ export default function Dashboard() {
       }
 
       // Charger les repas sauvegardés pour l'import
-      if (profileData?.savedPlans?.meals) {
-        setSavedMeals(profileData.savedPlans.meals);
+      if (profileData?.saved_plans?.meals) {
+        setSavedMeals(profileData.saved_plans.meals);
       }
       
       // Vérifier et réinitialiser les données nutritionnelles si nouveau jour

@@ -2,8 +2,8 @@
 // Gestionnaire de mode hors ligne intelligent pour TheSport
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabaseStorageAdapter } from './storage-adapter-supabase';
 import { analytics } from './analytics';
+import { supabaseStorageAdapter } from './storage-adapter-supabase';
 
 export type OfflineData = {
   key: string;
@@ -312,3 +312,4 @@ class OfflineManager {
 
 // Instance singleton
 export const offlineManager = new OfflineManager();
+

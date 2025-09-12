@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
+import { authService } from "../../lib/auth";
 import { deletePlan, deleteProfile, loadProfile, saveProfile, UserProfile } from "../../lib/profile";
 
 // Fonctions d'extraction et de nettoyage (copiées depuis le dashboard)
@@ -213,6 +214,12 @@ export default function Profile() {
     date: string;
   } | null>(null);
   const [showPlanDetail, setShowPlanDetail] = useState(false);
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
+  const [userEmail, setUserEmail] = useState<string>("");
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
 
   useEffect(() => {
     loadUserProfile();
@@ -260,8 +267,62 @@ export default function Profile() {
         console.log("Horaires préférés - chatResponses:", userProfile.chatResponses?.preferredTime);
         console.log("Horaires préférés - profile:", userProfile.preferredTime);
       }
+      
+      // Charger l'email de l'utilisateur
+      await loadUserEmail();
     } catch (error) {
       console.error("Erreur lors du chargement du profil:", error);
+    }
+  };
+
+  const loadUserEmail = async () => {
+    try {
+      const currentUser = authService.getCurrentUser();
+      if (currentUser?.email) {
+        setUserEmail(currentUser.email);
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement de l'email:", error);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+      Alert.alert("Erreur", "Veuillez remplir tous les champs");
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      Alert.alert("Erreur", "Les nouveaux mots de passe ne correspondent pas");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      Alert.alert("Erreur", "Le nouveau mot de passe doit contenir au moins 6 caractères");
+      return;
+    }
+
+    try {
+      const result = await authService.changePassword(currentPassword, newPassword);
+      
+      if (result.success) {
+        Alert.alert("Succès", "Mot de passe modifié avec succès", [
+          {
+            text: "OK",
+            onPress: () => {
+              setShowChangePassword(false);
+              setCurrentPassword("");
+              setNewPassword("");
+              setConfirmNewPassword("");
+            }
+          }
+        ]);
+      } else {
+        Alert.alert("Erreur", result.error || "Impossible de changer le mot de passe");
+      }
+    } catch (error) {
+      console.error("Erreur lors du changement de mot de passe:", error);
+      Alert.alert("Erreur", "Une erreur est survenue");
     }
   };
 
@@ -359,6 +420,29 @@ export default function Profile() {
     setProfile(updatedProfile);
   };
 
+  const handleSignOut = async () => {
+    Alert.alert(
+      "Déconnexion",
+      "Êtes-vous sûr de vouloir vous déconnecter ?",
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Déconnexion",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await authService.signOut();
+              router.replace("/auth");
+            } catch (error) {
+              console.error("Erreur lors de la déconnexion:", error);
+              Alert.alert("Erreur", "Impossible de se déconnecter");
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const openPlanDetail = (type: 'workout' | 'meal', plan: { id: string; title: string; content: string; date: string }) => {
     setSelectedPlan({
       id: plan.id,
@@ -377,6 +461,21 @@ export default function Profile() {
         <Text style={{ color: "#fff", fontSize: 24, fontWeight: "800" }}>
           Mon Profil
         </Text>
+        <Pressable
+          onPress={() => setShowAccountMenu(true)}
+          style={{
+            width: 40,
+            height: 40,
+            backgroundColor: "#1a1f2e",
+            borderRadius: 8,
+            justifyContent: "center",
+            alignItems: "center",
+            borderWidth: 1,
+            borderColor: "#333",
+          }}
+        >
+          <Text style={{ color: "#fff", fontSize: 18, fontWeight: "600" }}>☰</Text>
+        </Pressable>
       </View>
       <Text style={{ color: "#aaa", marginBottom: 24 }}>
         Gère tes informations et préférences
@@ -1117,10 +1216,10 @@ export default function Profile() {
           {/* Séances sauvegardées */}
           <View style={{ marginBottom: 16 }}>
             <Text style={{ color: "#60A5FA", fontSize: 16, fontWeight: "600", marginBottom: 8 }}>
-              Séances ({profile?.savedPlans?.workouts?.length || 0})
+              Séances ({profile?.saved_plans?.workouts?.length || 0})
             </Text>
-            {profile?.savedPlans?.workouts?.length ? (
-              profile.savedPlans.workouts.slice(-3).reverse().map((workout) => {
+            {profile?.saved_plans?.workouts?.length ? (
+              profile.saved_plans.workouts.slice(-3).reverse().map((workout) => {
                 const cleanedContent = cleanWorkoutContent(workout.content);
                 
                 return (
@@ -1226,10 +1325,10 @@ export default function Profile() {
           {/* Repas sauvegardés */}
           <View>
             <Text style={{ color: "#3B82F6", fontSize: 16, fontWeight: "600", marginBottom: 8 }}>
-              Repas ({profile?.savedPlans?.meals?.length || 0})
+              Repas ({profile?.saved_plans?.meals?.length || 0})
             </Text>
-            {profile?.savedPlans?.meals?.length ? (
-              profile.savedPlans.meals.slice(-3).reverse().map((meal) => {
+            {profile?.saved_plans?.meals?.length ? (
+              profile.saved_plans.meals.slice(-3).reverse().map((meal) => {
                 const mealType = getMealType(meal.content);
                 const extractedTitle = extractMealTitle(meal.content);
                 const cleanedContent = cleanMealContent(meal.content);
@@ -1340,7 +1439,6 @@ export default function Profile() {
         </View>
 
 
-
         {/* Bouton de test pour réinitialiser l'onboarding */}
         <Pressable
           onPress={async () => {
@@ -1364,10 +1462,17 @@ export default function Profile() {
         <Pressable
           onPress={async () => {
             if (profile) {
-              const updatedProfile = { ...profile, chatQuestionsAsked: false };
+              const updatedProfile = { ...profile, chat_questions_asked: false };
               await saveProfile(updatedProfile);
               setProfile(updatedProfile);
               console.log("Questions du chat réinitialisées");
+              
+              // Forcer le rechargement du profil dans le chat
+              Alert.alert(
+                "Questions réinitialisées",
+                "Les questions du chat ont été réinitialisées. Retournez au chat pour redémarrer l'onboarding.",
+                [{ text: "OK" }]
+              );
             }
           }}
           style={{
@@ -1382,6 +1487,207 @@ export default function Profile() {
           <Text style={{ color: "#60A5FA", fontWeight: "700" }}>Réinitialiser les questions du chat (test)</Text>
         </Pressable>
       </View>
+
+      {/* Modal Menu Compte */}
+      <Modal
+        visible={showAccountMenu}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowAccountMenu(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: "#0a0a0a", paddingTop: 60 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingBottom: 20 }}>
+            <Text style={{ color: "#fff", fontSize: 20, fontWeight: "bold" }}>Menu Compte</Text>
+            <Pressable
+              onPress={() => setShowAccountMenu(false)}
+              style={{ padding: 8 }}
+            >
+              <Text style={{ color: "#666", fontSize: 18 }}>✕</Text>
+            </Pressable>
+          </View>
+
+          <ScrollView style={{ flex: 1, paddingHorizontal: 20 }}>
+            {/* Informations du compte */}
+            <View style={{ backgroundColor: "#1a1f2e", borderRadius: 12, padding: 20, marginBottom: 20 }}>
+              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "bold", marginBottom: 15 }}>Informations du compte</Text>
+              
+              <View style={{ marginBottom: 12 }}>
+                <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 4 }}>Email</Text>
+                <Text style={{ color: "#fff", fontSize: 16 }}>{userEmail || "Non défini"}</Text>
+              </View>
+              
+              <View style={{ marginBottom: 12 }}>
+                <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 4 }}>Membre depuis</Text>
+                <Text style={{ color: "#fff", fontSize: 16 }}>Janvier 2025</Text>
+              </View>
+              
+              <View style={{ marginBottom: 12 }}>
+                <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 4 }}>Plan</Text>
+                <Text style={{ color: "#00D4AA", fontSize: 16, fontWeight: "600" }}>Gratuit</Text>
+              </View>
+            </View>
+
+            {/* Actions du compte */}
+            <View style={{ backgroundColor: "#1a1f2e", borderRadius: 12, padding: 20, marginBottom: 20 }}>
+              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "bold", marginBottom: 15 }}>Actions</Text>
+              
+              <Pressable
+                onPress={() => {
+                  setShowAccountMenu(false);
+                  setShowChangePassword(true);
+                }}
+                style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#333" }}
+              >
+                <Text style={{ color: "#fff", fontSize: 16 }}>Changer le mot de passe</Text>
+              </Pressable>
+              
+              <Pressable
+                onPress={() => {
+                  setShowAccountMenu(false);
+                  // Ici on pourrait ajouter une fonction pour exporter les données
+                  Alert.alert("Info", "Fonctionnalité à venir");
+                }}
+                style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#333" }}
+              >
+                <Text style={{ color: "#fff", fontSize: 16 }}>Exporter mes données</Text>
+              </Pressable>
+              
+              <Pressable
+                onPress={() => {
+                  setShowAccountMenu(false);
+                  // Ici on pourrait ajouter une fonction pour supprimer le compte
+                  Alert.alert("Info", "Fonctionnalité à venir");
+                }}
+                style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#333" }}
+              >
+                <Text style={{ color: "#ff6b6b", fontSize: 16 }}>Supprimer le compte</Text>
+              </Pressable>
+            </View>
+
+            {/* Bouton de déconnexion */}
+            <Pressable
+              onPress={handleSignOut}
+              style={{
+                backgroundColor: "#2a1a1a",
+                paddingVertical: 16,
+                borderRadius: 12,
+                alignItems: "center",
+                marginBottom: 20,
+                borderWidth: 1,
+                borderColor: "#ff6b6b",
+              }}
+            >
+              <Text style={{ color: "#ff6b6b", fontSize: 16, fontWeight: "bold" }}>Se déconnecter</Text>
+            </Pressable>
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Modal Changer le mot de passe */}
+      <Modal
+        visible={showChangePassword}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowChangePassword(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: "#0a0a0a", paddingTop: 60 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingBottom: 20 }}>
+            <Text style={{ color: "#fff", fontSize: 20, fontWeight: "bold" }}>Changer le mot de passe</Text>
+            <Pressable
+              onPress={() => setShowChangePassword(false)}
+              style={{ padding: 8 }}
+            >
+              <Text style={{ color: "#666", fontSize: 18 }}>✕</Text>
+            </Pressable>
+          </View>
+
+          <ScrollView style={{ flex: 1, paddingHorizontal: 20 }}>
+            <View style={{ backgroundColor: "#1a1f2e", borderRadius: 12, padding: 20, marginBottom: 20 }}>
+              <Text style={{ color: "#fff", fontSize: 16, marginBottom: 20, lineHeight: 22 }}>
+                Pour des raisons de sécurité, vous devez confirmer votre mot de passe actuel avant d'en définir un nouveau.
+              </Text>
+
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>Mot de passe actuel</Text>
+                <TextInput
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                  placeholder="••••••••"
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  style={{
+                    backgroundColor: "#0a0a0a",
+                    borderRadius: 8,
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    fontSize: 16,
+                    color: "#fff",
+                    borderWidth: 1,
+                    borderColor: "#333",
+                  }}
+                />
+              </View>
+
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>Nouveau mot de passe</Text>
+                <TextInput
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  placeholder="••••••••"
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  style={{
+                    backgroundColor: "#0a0a0a",
+                    borderRadius: 8,
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    fontSize: 16,
+                    color: "#fff",
+                    borderWidth: 1,
+                    borderColor: "#333",
+                  }}
+                />
+              </View>
+
+              <View style={{ marginBottom: 24 }}>
+                <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>Confirmer le nouveau mot de passe</Text>
+                <TextInput
+                  value={confirmNewPassword}
+                  onChangeText={setConfirmNewPassword}
+                  placeholder="••••••••"
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  style={{
+                    backgroundColor: "#0a0a0a",
+                    borderRadius: 8,
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    fontSize: 16,
+                    color: "#fff",
+                    borderWidth: 1,
+                    borderColor: "#333",
+                  }}
+                />
+              </View>
+
+              <Pressable
+                onPress={handleChangePassword}
+                style={{
+                  backgroundColor: "#007AFF",
+                  paddingVertical: 16,
+                  borderRadius: 8,
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600" }}>Changer le mot de passe</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
 
       {/* Modal de détail du plan */}
       <Modal

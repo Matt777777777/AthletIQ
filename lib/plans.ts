@@ -19,19 +19,21 @@ async function getAll(): Promise<SavedPlan[]> {
   try {
     // Utiliser le storage adapter avec fallback automatique
     const plans = await storageAdapter.load(KEY);
-    if (plans) return plans as SavedPlan[];
+    if (plans && Array.isArray(plans)) return plans as SavedPlan[];
     
     // Fallback vers AsyncStorage si pas de données
     const raw = await AsyncStorage.getItem(KEY);
     if (!raw) return [];
-    return JSON.parse(raw) as SavedPlan[];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed as SavedPlan[] : [];
   } catch (e) {
     console.error("Erreur en chargeant les plans:", e);
     // Fallback vers AsyncStorage en cas d'erreur
     try {
       const raw = await AsyncStorage.getItem(KEY);
       if (!raw) return [];
-      return JSON.parse(raw) as SavedPlan[];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed as SavedPlan[] : [];
     } catch (fallbackError) {
       console.error("❌ Erreur fallback AsyncStorage:", fallbackError);
       return [];

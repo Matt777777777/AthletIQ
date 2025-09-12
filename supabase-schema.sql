@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   chat_questions_asked BOOLEAN DEFAULT FALSE,
   daily_meals JSONB,
   daily_workout JSONB,
+  saved_plans JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(user_id)
@@ -93,8 +94,10 @@ CREATE TABLE IF NOT EXISTS day_plans (
 CREATE TABLE IF NOT EXISTS chat_messages (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  content TEXT NOT NULL,
-  is_user BOOLEAN NOT NULL,
+  message_id TEXT NOT NULL,
+  text TEXT NOT NULL,
+  sender TEXT NOT NULL CHECK (sender IN ('user', 'ai')),
+  original_text TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -227,3 +230,4 @@ CREATE POLICY "Users can update own chat messages" ON chat_messages
 
 CREATE POLICY "Users can delete own chat messages" ON chat_messages
   FOR DELETE USING (auth.uid() = user_id);
+

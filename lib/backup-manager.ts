@@ -1,9 +1,9 @@
 // lib/backup-manager.ts
 // Système de sauvegarde automatique pour TheSport
 
-import { getCurrentUserId, getSupabaseClient } from './supabase';
 import { analytics } from './analytics';
 import { notificationManager } from './notifications';
+import { getCurrentUserId, getSupabaseClient } from './supabase';
 
 export type BackupData = {
   userId: string;
@@ -482,3 +482,5 @@ class BackupManager {
 
 // Instance singleton
 export const backupManager = new BackupManager();
+
+
