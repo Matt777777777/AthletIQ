@@ -89,7 +89,7 @@ export default function Dashboard() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [showDayDetail, setShowDayDetail] = useState(false);
-  const [selectedDayData, setSelectedDayData] = useState<NonNullable<UserProfile['dailyHistory']>[string] | null>(null);
+  const [selectedDayData, setSelectedDayData] = useState<NonNullable<UserProfile['daily_history']>[string] | null>(null);
 
   // Fonction pour extraire le titre d'une séance
   const extractWorkoutTitle = (content: string): string => {
@@ -349,16 +349,16 @@ export default function Dashboard() {
       }
 
       // Charger les séances du jour depuis le profil
-      if (profileData?.dailyWorkouts && Array.isArray(profileData.dailyWorkouts)) {
+      if (profileData?.daily_workouts && Array.isArray(profileData.daily_workouts)) {
         // Nouvelles séances multiples
-        const workouts = profileData.dailyWorkouts.map((workout: any) => ({
+        const workouts = profileData.daily_workouts.map((workout: any) => ({
           ...workout,
           calories: workout.calories || estimateWorkoutCalories(workout.content, profileData)
         }));
         setDailyWorkouts(workouts);
-      } else if (profileData?.dailyWorkout) {
+      } else if (profileData?.daily_workout) {
         // Ancien format (compatibilité)
-        const workout = profileData.dailyWorkout;
+        const workout = profileData.daily_workout;
         const estimatedCalories = workout.calories || estimateWorkoutCalories(workout.content, profileData);
         setDailyWorkouts([{
           ...workout,
@@ -571,48 +571,221 @@ export default function Dashboard() {
     return { calories: totalCalories, carbs: totalCarbs, protein: totalProtein, fat: totalFat };
   };
 
-  // Fonction pour estimer les calories et macronutriments d'un repas
+  // Base de données des calories par ingrédient (pour 100g)
+  const ingredientCalories = {
+    // Protéines
+    'poulet': { calories: 165, carbs: 0, protein: 31, fat: 3.6 },
+    'saumon': { calories: 208, carbs: 0, protein: 25, fat: 12 },
+    'œuf': { calories: 155, carbs: 1.1, protein: 13, fat: 11 },
+    'œufs': { calories: 155, carbs: 1.1, protein: 13, fat: 11 },
+    'fromage blanc': { calories: 59, carbs: 3.4, protein: 10, fat: 0.4 },
+    'yaourt grec': { calories: 59, carbs: 3.6, protein: 10, fat: 0.4 },
+    'thon': { calories: 144, carbs: 0, protein: 30, fat: 1 },
+    'dinde': { calories: 189, carbs: 0, protein: 29, fat: 7 },
+    'bœuf': { calories: 250, carbs: 0, protein: 26, fat: 15 },
+    'porc': { calories: 263, carbs: 0, protein: 27, fat: 16 },
+    'cabillaud': { calories: 82, carbs: 0, protein: 18, fat: 0.7 },
+    'crevettes': { calories: 99, carbs: 0.2, protein: 24, fat: 0.3 },
+    
+    // Glucides
+    'riz': { calories: 130, carbs: 28, protein: 2.7, fat: 0.3 },
+    'quinoa': { calories: 120, carbs: 22, protein: 4.4, fat: 1.9 },
+    'pâtes': { calories: 131, carbs: 25, protein: 5, fat: 1.1 },
+    'pomme de terre': { calories: 77, carbs: 17, protein: 2, fat: 0.1 },
+    'patate douce': { calories: 86, carbs: 20, protein: 1.6, fat: 0.1 },
+    'avoine': { calories: 389, carbs: 66, protein: 17, fat: 7 },
+    'pain': { calories: 265, carbs: 49, protein: 9, fat: 3.2 },
+    'banane': { calories: 89, carbs: 23, protein: 1.1, fat: 0.3 },
+    'pomme': { calories: 52, carbs: 14, protein: 0.3, fat: 0.2 },
+    'orange': { calories: 47, carbs: 12, protein: 0.9, fat: 0.1 },
+    
+    // Légumes
+    'brocoli': { calories: 34, carbs: 7, protein: 2.8, fat: 0.4 },
+    'épinards': { calories: 23, carbs: 3.6, protein: 2.9, fat: 0.4 },
+    'courgette': { calories: 17, carbs: 3.1, protein: 1.2, fat: 0.3 },
+    'poivron': { calories: 31, carbs: 7, protein: 1, fat: 0.3 },
+    'tomate': { calories: 18, carbs: 3.9, protein: 0.9, fat: 0.2 },
+    'carotte': { calories: 41, carbs: 10, protein: 0.9, fat: 0.2 },
+    'concombre': { calories: 16, carbs: 4, protein: 0.7, fat: 0.1 },
+    'salade': { calories: 15, carbs: 3, protein: 1.4, fat: 0.2 },
+    'champignon': { calories: 22, carbs: 3.3, protein: 3.1, fat: 0.3 },
+    'oignon': { calories: 40, carbs: 9, protein: 1.1, fat: 0.1 },
+    
+    // Graisses
+    'avocat': { calories: 160, carbs: 9, protein: 2, fat: 15 },
+    'huile d\'olive': { calories: 884, carbs: 0, protein: 0, fat: 100 },
+    'd\'huile d\'olive': { calories: 884, carbs: 0, protein: 0, fat: 100 },
+    'huile': { calories: 884, carbs: 0, protein: 0, fat: 100 },
+    'beurre': { calories: 717, carbs: 0.1, protein: 0.9, fat: 81 },
+    'amandes': { calories: 579, carbs: 22, protein: 21, fat: 50 },
+    'noix': { calories: 654, carbs: 14, protein: 15, fat: 65 },
+    'noix de cajou': { calories: 553, carbs: 30, protein: 18, fat: 44 },
+    'graines de chia': { calories: 486, carbs: 42, protein: 17, fat: 31 },
+    
+    // Laitages
+    'lait': { calories: 42, carbs: 5, protein: 3.4, fat: 1 },
+    'fromage': { calories: 113, carbs: 1, protein: 7, fat: 9 },
+    'parmesan': { calories: 431, carbs: 4.1, protein: 38, fat: 29 },
+    'mozzarella': { calories: 300, carbs: 2.2, protein: 22, fat: 22 },
+    
+    // Fruits
+    'fruits rouges': { calories: 57, carbs: 14, protein: 0.7, fat: 0.3 },
+    'fraise': { calories: 32, carbs: 8, protein: 0.7, fat: 0.3 },
+    'myrtille': { calories: 57, carbs: 14, protein: 0.7, fat: 0.3 },
+    'framboise': { calories: 52, carbs: 12, protein: 1.2, fat: 0.7 },
+    'kiwi': { calories: 61, carbs: 15, protein: 1.1, fat: 0.5 },
+    'mangue': { calories: 60, carbs: 15, protein: 0.8, fat: 0.4 },
+    
+    // Autres
+    'miel': { calories: 304, carbs: 82, protein: 0.3, fat: 0 },
+    'sucre': { calories: 387, carbs: 100, protein: 0, fat: 0 },
+    'citron': { calories: 29, carbs: 9, protein: 1.1, fat: 0.3 },
+    'ail': { calories: 149, carbs: 33, protein: 6.4, fat: 0.5 },
+    'gingembre': { calories: 80, carbs: 18, protein: 1.8, fat: 0.8 }
+  };
+
+  // Fonction pour extraire les ingrédients et quantités du contenu du repas
+  const extractIngredientsFromMeal = (mealContent: string) => {
+    const ingredients = [];
+    const lines = mealContent.split('\n');
+    
+    for (const line of lines) {
+      // Chercher les lignes qui commencent par "•" ou "-" (format de liste)
+      if (line.trim().match(/^[•\-]\s*(.+)/)) {
+        const ingredientText = line.trim().replace(/^[•\-]\s*/, '');
+        
+        // Patterns pour différents formats d'ingrédients
+        let match;
+        let quantity = 1;
+        let unit = 'g';
+        let ingredient = '';
+        
+        // Pattern 1: "200g de poulet" ou "150g de riz"
+        match = ingredientText.match(/^(\d+(?:\.\d+)?)\s*(g|kg|ml|cl|dl|l)\s*(?:de\s+)?(.+)/i);
+        if (match) {
+          quantity = parseFloat(match[1]);
+          unit = match[2];
+          ingredient = match[3].toLowerCase().trim();
+        }
+        // Pattern 2: "1 cuillère à soupe d'huile d'olive"
+        else if (ingredientText.match(/^(\d+)\s+(cuillère|cuillères)\s+(?:à\s+)?(soupe|café)\s+(?:de\s+)?(.+)/i)) {
+          match = ingredientText.match(/^(\d+)\s+(cuillère|cuillères)\s+(?:à\s+)?(soupe|café)\s+(?:de\s+)?(.+)/i);
+          if (match) {
+            quantity = parseFloat(match[1]);
+            unit = 'cuillère';
+            ingredient = match[4].toLowerCase().trim();
+          }
+        }
+        // Pattern 3: "1 avocat (150g)" ou "2 œufs"
+        else if (ingredientText.match(/^(\d+)\s+(.+?)(?:\s*\((\d+(?:\.\d+)?)\s*(g|kg)\))?$/i)) {
+          match = ingredientText.match(/^(\d+)\s+(.+?)(?:\s*\((\d+(?:\.\d+)?)\s*(g|kg)\))?$/i);
+          if (match) {
+            quantity = parseFloat(match[1]);
+            ingredient = match[2].toLowerCase().trim();
+            if (match[3] && match[4]) {
+              // Si on a le poids entre parenthèses, l'utiliser
+              quantity = parseFloat(match[3]);
+              unit = match[4];
+            } else {
+              // Sinon, utiliser des quantités par défaut pour les unités
+              if (ingredient.includes('œuf')) {
+                quantity = quantity * 50; // 1 œuf = 50g
+                unit = 'g';
+              } else if (ingredient.includes('avocat')) {
+                quantity = quantity * 150; // 1 avocat = 150g
+                unit = 'g';
+              } else if (ingredient.includes('banane')) {
+                quantity = quantity * 120; // 1 banane = 120g
+                unit = 'g';
+              } else if (ingredient.includes('pomme')) {
+                quantity = quantity * 150; // 1 pomme = 150g
+                unit = 'g';
+              } else {
+                unit = 'g';
+              }
+            }
+          }
+        }
+        // Pattern 4: "1 tasse de farine" ou "2 pincées de sel"
+        else if (ingredientText.match(/^(\d+)\s+(tasse|tasses|pincée|pincées)\s+(?:de\s+)?(.+)/i)) {
+          match = ingredientText.match(/^(\d+)\s+(tasse|tasses|pincée|pincées)\s+(?:de\s+)?(.+)/i);
+          if (match) {
+            quantity = parseFloat(match[1]);
+            unit = match[2];
+            ingredient = match[3].toLowerCase().trim();
+          }
+        }
+        
+        if (ingredient) {
+          // Convertir en grammes pour le calcul
+          let quantityInGrams = quantity;
+          if (unit.includes('kg')) quantityInGrams = quantity * 1000;
+          else if (unit.includes('l') || unit.includes('ml')) quantityInGrams = quantity; // Approximation pour les liquides
+          else if (unit.includes('cuillère')) quantityInGrams = quantity * 15; // 1 cuillère = 15g
+          else if (unit.includes('tasse')) quantityInGrams = quantity * 200; // 1 tasse = 200g
+          else if (unit.includes('pincée')) quantityInGrams = quantity * 1; // 1 pincée = 1g
+          
+          ingredients.push({
+            name: ingredient,
+            quantity: quantityInGrams,
+            originalText: ingredientText
+          });
+        }
+      }
+    }
+    
+    return ingredients;
+  };
+
+  // Fonction pour calculer les calories et macronutriments d'un repas basée sur son contenu réel
   const estimateMealNutrition = (mealContent: string, mealType: 'breakfast' | 'lunch' | 'snack' | 'dinner') => {
-    // Estimation basée sur le type de repas et le contenu
-    const baseCalories = {
-      breakfast: 400,
-      lunch: 600,
-      snack: 200,
-      dinner: 500
+    const ingredients = extractIngredientsFromMeal(mealContent);
+    
+    let totalCalories = 0;
+    let totalCarbs = 0;
+    let totalProtein = 0;
+    let totalFat = 0;
+    
+    // Calculer les valeurs nutritionnelles pour chaque ingrédient
+    for (const ingredient of ingredients) {
+      const nutrition = ingredientCalories[ingredient.name as keyof typeof ingredientCalories];
+      if (nutrition) {
+        const factor = ingredient.quantity / 100; // Convertir de 100g à la quantité réelle
+        totalCalories += nutrition.calories * factor;
+        totalCarbs += nutrition.carbs * factor;
+        totalProtein += nutrition.protein * factor;
+        totalFat += nutrition.fat * factor;
+      }
+    }
+    
+    // Si aucun ingrédient trouvé, utiliser les valeurs par défaut basées sur le type de repas
+    if (totalCalories === 0) {
+      const baseCalories = {
+        breakfast: 400,
+        lunch: 600,
+        snack: 200,
+        dinner: 500
+      };
+      
+      const baseMacros = {
+        breakfast: { carbs: 50, protein: 20, fat: 15 },
+        lunch: { carbs: 75, protein: 30, fat: 20 },
+        snack: { carbs: 25, protein: 10, fat: 8 },
+        dinner: { carbs: 60, protein: 35, fat: 18 }
+      };
+      
+      totalCalories = baseCalories[mealType];
+      totalCarbs = baseMacros[mealType].carbs;
+      totalProtein = baseMacros[mealType].protein;
+      totalFat = baseMacros[mealType].fat;
+    }
+    
+    return {
+      calories: Math.round(totalCalories),
+      carbs: Math.round(totalCarbs),
+      protein: Math.round(totalProtein),
+      fat: Math.round(totalFat)
     };
-
-    // Estimation des macronutriments (approximation)
-    const baseMacros = {
-      breakfast: { carbs: 50, protein: 20, fat: 15 },
-      lunch: { carbs: 75, protein: 30, fat: 20 },
-      snack: { carbs: 25, protein: 10, fat: 8 },
-      dinner: { carbs: 60, protein: 35, fat: 18 }
-    };
-
-    // Ajustements basés sur le contenu (mots-clés)
-    let multiplier = 1;
-    const content = mealContent.toLowerCase();
-
-    // Détecter des ingrédients riches en calories
-    if (content.includes('avocat') || content.includes('huile') || content.includes('beurre')) {
-      multiplier += 0.2; // +20% de calories
-    }
-    if (content.includes('pâtes') || content.includes('riz') || content.includes('quinoa')) {
-      multiplier += 0.15; // +15% de glucides
-    }
-    if (content.includes('poulet') || content.includes('saumon') || content.includes('œuf')) {
-      multiplier += 0.1; // +10% de protéines
-    }
-    if (content.includes('salade') || content.includes('légumes') || content.includes('brocoli')) {
-      multiplier -= 0.1; // -10% de calories (repas plus léger)
-    }
-
-    const calories = Math.round(baseCalories[mealType] * multiplier);
-    const carbs = Math.round(baseMacros[mealType].carbs * multiplier);
-    const protein = Math.round(baseMacros[mealType].protein * multiplier);
-    const fat = Math.round(baseMacros[mealType].fat * multiplier);
-
-    return { calories, carbs, protein, fat };
   };
 
   // Fonctions de gestion des séances
@@ -814,7 +987,7 @@ export default function Dashboard() {
     console.log(`- Taille: ${profile.height || "Non défini"} cm`);
     console.log(`- Objectif: ${profile.goal || "Non défini"}`);
     console.log(`- Séances/semaine: ${profile.sessions || 0}`);
-    console.log(`- Niveau de sport: ${profile.chatResponses?.fitnessLevel || profile.fitnessLevel || "Non défini"}`);
+    console.log(`- Niveau de sport: ${profile.chat_responses?.fitnessLevel || profile.fitness_level || "Non défini"}`);
     console.log(`- Régime: ${profile.diet || "Non défini"}`);
     console.log(`- Calories cibles calculées: ${kcalTarget} kcal`);
     console.log(`- Consommé: ${kcalConsumed} kcal`);
@@ -2210,7 +2383,7 @@ export default function Dashboard() {
             <Calendar
               selectedDate={selectedDate}
               onDateSelect={handleDateSelect}
-              dailyHistory={profile?.dailyHistory}
+              dailyHistory={profile?.daily_history}
               onDayPress={handleDateSelect}
             />
     </View>
