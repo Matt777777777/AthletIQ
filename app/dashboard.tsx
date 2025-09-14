@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import Calendar from "../components/Calendar";
 import DayDetailModal from "../components/DayDetailModal";
+import { MealNutrition } from "../lib/meal-nutrition";
 import { DailyIntake, estimateKcalTarget, loadDailyIntake, saveDailyIntake } from "../lib/nutrition";
 import { latestByType, SavedPlan } from "../lib/plans";
 import { loadDailyHistory, loadProfile, saveDailyHistory, saveDailyMeal, UserProfile } from "../lib/profile";
@@ -29,13 +30,13 @@ export default function Dashboard() {
 
   // États pour les repas de la journée
   const [dailyMeals, setDailyMeals] = useState({
-    breakfast: null as { id: string; title: string; content: string; date: string; eaten?: boolean } | null,
-    lunch: null as { id: string; title: string; content: string; date: string; eaten?: boolean } | null,
-    snack: null as { id: string; title: string; content: string; date: string; eaten?: boolean } | null,
-    dinner: null as { id: string; title: string; content: string; date: string; eaten?: boolean } | null
+    breakfast: null as { id: string; title: string; content: string; date: string; eaten?: boolean; nutrition?: MealNutrition } | null,
+    lunch: null as { id: string; title: string; content: string; date: string; eaten?: boolean; nutrition?: MealNutrition } | null,
+    snack: null as { id: string; title: string; content: string; date: string; eaten?: boolean; nutrition?: MealNutrition } | null,
+    dinner: null as { id: string; title: string; content: string; date: string; eaten?: boolean; nutrition?: MealNutrition } | null
   });
 
-  // États pour les séances du jour (support 2 séances max)
+  // États pour les séances du jour (nombre illimité)
   const [dailyWorkouts, setDailyWorkouts] = useState<Array<{
     id: string;
     title: string;
@@ -118,7 +119,7 @@ export default function Dashboard() {
   };
 
   // Fonction pour extraire les sections d'une séance
-  const extractWorkoutSections = (content: string) => {
+  const extractWorkoutSections = (content: string | undefined) => {
     const sections: {
       warmup: string[];
       main: string[];
@@ -128,6 +129,10 @@ export default function Dashboard() {
       main: [],
       cooldown: []
     };
+
+    if (!content || typeof content !== 'string') {
+      return sections;
+    }
 
     const lines = content.split('\n').filter(line => line.trim().length > 0);
     let currentSection: 'warmup' | 'main' | 'cooldown' = 'main'; // Par défaut, circuit principal
@@ -162,7 +167,10 @@ export default function Dashboard() {
   };
 
   // Fonction pour extraire le matériel d'une séance
-  const extractWorkoutEquipment = (content: string): string => {
+  const extractWorkoutEquipment = (content: string | undefined): string => {
+    if (!content || typeof content !== 'string') {
+      return 'Aucun';
+    }
     const lines = content.split('\n');
     for (const line of lines) {
       if (/matériel\s*:/i.test(line)) {
@@ -301,6 +309,85 @@ export default function Dashboard() {
     }
   };
 
+  // Calcul de l'objectif de calories dépensées pour le sport
+  const calculateSportCalorieGoal = () => {
+    if (!profile) return 300; // Objectif par défaut
+
+    try {
+      // Calculer le BMR (Basal Metabolic Rate) pour estimer les besoins
+      const age = parseInt(String(profile.age || "25"));
+      const weight = parseFloat(String(profile.weight || "70"));
+      const height = parseFloat(String(profile.height || "170"));
+      const gender = profile.gender || "homme";
+
+      // Formule de Mifflin-St Jeor pour le BMR
+      let bmr;
+      if (gender === "female") {
+        bmr = 10 * weight + 6.25 * height - 5 * age - 161;
+      } else {
+        bmr = 10 * weight + 6.25 * height - 5 * age + 5;
+      }
+
+      // Facteur d'activité basé sur le niveau de fitness et les séances par semaine
+      const sessionsPerWeek = parseInt(String(profile.sessions || "3"));
+      const fitnessLevel = profile.chat_responses?.fitnessLevel || profile.fitness_level || "débutant";
+      
+      let activityFactor = 1.2; // Sédentaire par défaut
+      
+      if (fitnessLevel === "débutant") {
+        if (sessionsPerWeek <= 2) activityFactor = 1.3;
+        else if (sessionsPerWeek <= 4) activityFactor = 1.4;
+        else activityFactor = 1.5;
+      } else if (fitnessLevel === "intermédiaire") {
+        if (sessionsPerWeek <= 2) activityFactor = 1.4;
+        else if (sessionsPerWeek <= 4) activityFactor = 1.6;
+        else activityFactor = 1.7;
+      } else if (fitnessLevel === "avancé") {
+        if (sessionsPerWeek <= 2) activityFactor = 1.5;
+        else if (sessionsPerWeek <= 4) activityFactor = 1.7;
+        else activityFactor = 1.9;
+      }
+
+      // Calculer les calories totales nécessaires
+      const totalCalories = bmr * activityFactor;
+      
+      // Objectif de calories à dépenser par l'exercice (15-25% du total)
+      let exerciseGoal;
+      if (profile.goal === "Perte de poids") {
+        exerciseGoal = totalCalories * 0.25; // 25% pour la perte de poids
+      } else if (profile.goal === "Prise de masse") {
+        exerciseGoal = totalCalories * 0.15; // 15% pour la prise de masse
+      } else if (profile.goal === "Maintien") {
+        exerciseGoal = totalCalories * 0.20; // 20% pour le maintien
+      } else {
+        exerciseGoal = totalCalories * 0.20; // 20% par défaut
+      }
+
+      // Ajuster selon l'âge (les personnes plus âgées ont besoin de moins d'exercice intense)
+      if (age > 50) {
+        exerciseGoal *= 0.9;
+      } else if (age > 65) {
+        exerciseGoal *= 0.8;
+      }
+
+      const finalGoal = Math.round(exerciseGoal);
+      
+      console.log('Debug calculateSportCalorieGoal:', {
+        profile: { age, weight, height, gender, goal: profile.goal, sessions: sessionsPerWeek, fitnessLevel },
+        bmr,
+        activityFactor,
+        totalCalories,
+        exerciseGoal,
+        finalGoal
+      });
+      
+      return Math.max(200, finalGoal); // Minimum 200 kcal
+    } catch (error) {
+      console.error('Erreur dans calculateSportCalorieGoal:', error);
+      return 300; // Valeur par défaut en cas d'erreur
+    }
+  };
+
   // Forcer la mise à jour du cercle de progression
   useEffect(() => {
     setCircleKey(prev => prev + 1);
@@ -365,8 +452,8 @@ export default function Dashboard() {
           calories: estimatedCalories,
           sessionType: 'morning' as const
         }]);
-      } else if (workoutData) {
-        // Si pas de séance du jour, utiliser la dernière séance comme base
+      } else if (workoutData && workoutData.title && workoutData.content && workoutData.title.trim() !== '' && workoutData.content.trim() !== '') {
+        // Si pas de séance du jour, utiliser la dernière séance comme base (seulement si elle est valide)
         const estimatedCalories = estimateWorkoutCalories(workoutData.content, profileData);
         setDailyWorkouts([{
           id: `daily_${Date.now()}`,
@@ -508,13 +595,18 @@ export default function Dashboard() {
       return;
     }
 
-    const success = await saveDailyMeal(currentMealType, {
+    // Calculer les calories du repas manuel
+    const nutrition = estimateMealNutrition(manualMealContent.trim(), currentMealType);
+    const mealWithNutrition = {
       id: `${currentMealType}_${Date.now()}`,
       title: manualMealTitle.trim(),
       content: manualMealContent.trim(),
       date: new Date().toISOString(),
-      eaten: false
-    });
+      eaten: false,
+      nutrition: nutrition
+    };
+
+    const success = await saveDailyMeal(currentMealType, mealWithNutrition);
 
     if (success) {
       // Recharger les données pour mettre à jour l'affichage
@@ -530,14 +622,19 @@ export default function Dashboard() {
   const handleImportMeal = async (meal: { id: string; title: string; content: string; date: string }) => {
     if (!currentMealType) return;
 
-    // Utiliser directement le titre et le contenu déjà formatés
-    const success = await saveDailyMeal(currentMealType, {
+    // Calculer les calories du repas importé
+    const nutrition = estimateMealNutrition(meal.content, currentMealType);
+    const mealWithNutrition = {
       id: `${currentMealType}_${Date.now()}`,
       title: meal.title,
       content: meal.content,
       date: new Date().toISOString(),
-      eaten: false
-    });
+      eaten: false,
+      nutrition: nutrition
+    };
+
+    // Utiliser directement le titre et le contenu déjà formatés
+    const success = await saveDailyMeal(currentMealType, mealWithNutrition);
 
     if (success) {
       // Recharger les données pour mettre à jour l'affichage
@@ -560,11 +657,20 @@ export default function Dashboard() {
 
     Object.entries(meals).forEach(([mealType, meal]) => {
       if (meal && meal.eaten) {
-        const nutrition = estimateMealNutrition(meal.content, mealType as 'breakfast' | 'lunch' | 'snack' | 'dinner');
-        totalCalories += nutrition.calories;
-        totalCarbs += nutrition.carbs;
-        totalProtein += nutrition.protein;
-        totalFat += nutrition.fat;
+        // Utiliser les calories stockées dans le repas si disponibles, sinon les calculer
+        if (meal.nutrition) {
+          totalCalories += meal.nutrition.calories;
+          totalCarbs += meal.nutrition.carbs;
+          totalProtein += meal.nutrition.protein;
+          totalFat += meal.nutrition.fat;
+        } else {
+          // Fallback: calculer les calories si elles ne sont pas stockées
+          const nutrition = estimateMealNutrition(meal.content, mealType as 'breakfast' | 'lunch' | 'snack' | 'dinner');
+          totalCalories += nutrition.calories;
+          totalCarbs += nutrition.carbs;
+          totalProtein += nutrition.protein;
+          totalFat += nutrition.fat;
+        }
       }
     });
 
@@ -822,12 +928,9 @@ export default function Dashboard() {
   };
 
   const importWorkout = async (workout: { id: string; title: string; content: string; date: string }) => {
-    if (dailyWorkouts.length >= 2) {
-      alert('Maximum 2 séances par jour');
-      return;
-    }
-
-    const sessionType: 'morning' | 'evening' = dailyWorkouts.length === 0 ? 'morning' : 'evening';
+    // Déterminer le type de séance : alterner entre matin et soir, ou matin si c'est la première
+    const sessionType: 'morning' | 'evening' = dailyWorkouts.length === 0 ? 'morning' : 
+      (dailyWorkouts.length % 2 === 0 ? 'morning' : 'evening');
     const estimatedCalories = estimateWorkoutCalories(workout.content, profile);
     
     const newWorkout = {
@@ -904,37 +1007,27 @@ export default function Dashboard() {
 
     setDailyMeals(updatedMeals);
 
-    // Calculer les calories et macronutriments du repas
-    const mealNutrition = estimateMealNutrition(meal.content, mealType);
+    // Utiliser les calories stockées dans le repas si disponibles, sinon les calculer
+    const mealNutrition = meal.nutrition || estimateMealNutrition(meal.content, mealType);
     
-    // Mettre à jour les valeurs nutritionnelles
+    // Recalculer les valeurs nutritionnelles basées sur tous les repas mangés
+    const nutritionFromMeals = recalculateNutritionFromMeals(updatedMeals);
+    setDailyIntake({ kcal: nutritionFromMeals.calories });
+    setMacronutrients({ 
+      carbs: nutritionFromMeals.carbs, 
+      protein: nutritionFromMeals.protein, 
+      fat: nutritionFromMeals.fat 
+    });
+
+    // Sauvegarder les nouvelles valeurs
+    await saveDailyIntake({ kcal: nutritionFromMeals.calories });
+    
     if (newEatenState) {
-      // Repas marqué comme mangé - ajouter les valeurs
-      const newKcal = dailyIntake.kcal + mealNutrition.calories;
-      const newCarbs = macronutrients.carbs + mealNutrition.carbs;
-      const newProtein = macronutrients.protein + mealNutrition.protein;
-      const newFat = macronutrients.fat + mealNutrition.fat;
-
-      setDailyIntake({ kcal: newKcal });
-      setMacronutrients({ carbs: newCarbs, protein: newProtein, fat: newFat });
-
-      // Sauvegarder les nouvelles valeurs
-      await saveDailyIntake({ kcal: newKcal });
       console.log(`Repas ${mealType} mangé: +${mealNutrition.calories} kcal, +${mealNutrition.carbs}g glucides, +${mealNutrition.protein}g protéines, +${mealNutrition.fat}g graisses`);
     } else {
-      // Repas marqué comme non mangé - soustraire les valeurs
-      const newKcal = Math.max(0, dailyIntake.kcal - mealNutrition.calories);
-      const newCarbs = Math.max(0, macronutrients.carbs - mealNutrition.carbs);
-      const newProtein = Math.max(0, macronutrients.protein - mealNutrition.protein);
-      const newFat = Math.max(0, macronutrients.fat - mealNutrition.fat);
-
-      setDailyIntake({ kcal: newKcal });
-      setMacronutrients({ carbs: newCarbs, protein: newProtein, fat: newFat });
-
-      // Sauvegarder les nouvelles valeurs
-      await saveDailyIntake({ kcal: newKcal });
       console.log(`Repas ${mealType} non mangé: -${mealNutrition.calories} kcal, -${mealNutrition.carbs}g glucides, -${mealNutrition.protein}g protéines, -${mealNutrition.fat}g graisses`);
     }
+    console.log(`Valeurs nutritionnelles totales: ${nutritionFromMeals.calories} kcal, ${nutritionFromMeals.carbs}g glucides, ${nutritionFromMeals.protein}g protéines, ${nutritionFromMeals.fat}g graisses`);
 
     // Sauvegarder l'état des repas dans AsyncStorage
     try {
@@ -1602,40 +1695,21 @@ export default function Dashboard() {
           SPORT
         </Text>
         
-        {/* Barre de progression des calories dépensées */}
+        {/* Calories dépensées */}
         <View style={{ marginBottom: 16 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
             <Text style={{ color: "#0070F3", fontWeight: "700", fontSize: 14 }}>
               Calories dépensées
-        </Text>
+            </Text>
             <Text style={{ color: "#0070F3", fontWeight: "700", fontSize: 14 }}>
-              {Math.round(calculateDailyCaloriesBurned())} / {Math.round(calculateDailyCalorieGoal())} kcal
-          </Text>
-          </View>
-          
-          {/* Barre de progression */}
-          <View
-            style={{
-              backgroundColor: "#2a2a2a",
-              height: 6,
-              borderRadius: 3,
-              overflow: "hidden",
-            }}
-          >
-            <View
-              style={{
-                backgroundColor: "#0070F3",
-                height: "100%",
-                width: `${Math.min((calculateDailyCaloriesBurned() / calculateDailyCalorieGoal()) * 100, 100)}%`,
-                borderRadius: 3,
-              }}
-            />
+              {Math.round(calculateDailyCaloriesBurned())} kcal
+            </Text>
           </View>
         </View>
         
         {dailyWorkouts.length > 0 ? (
           <View>
-            {dailyWorkouts.map((workout, index) => (
+            {dailyWorkouts.filter(workout => workout.title && workout.content && workout.title.trim() !== '' && workout.content.trim() !== '').map((workout, index) => (
               <View key={workout.id} style={{ marginBottom: 12 }}>
                 <Pressable
                   onPress={() => openWorkoutDetail(workout)}
@@ -1700,8 +1774,7 @@ export default function Dashboard() {
               </View>
             ))}
 
-            {dailyWorkouts.length < 2 && (
-          <Pressable
+            <Pressable
                 onPress={() => setShowImportModal(true)}
             style={{
                   backgroundColor: "#0070F3",
@@ -1716,7 +1789,6 @@ export default function Dashboard() {
                   Importer une séance enregistrée
             </Text>
               </Pressable>
-            )}
           </View>
         ) : (
           <View style={{ alignItems: "center", paddingVertical: 20 }}>
@@ -2024,7 +2096,7 @@ export default function Dashboard() {
                       padding: 12,
                       borderRadius: 8,
                       marginBottom: 8,
-              borderWidth: 1,
+                      borderWidth: 1,
                       borderColor: "#333",
                     }}
                   >

@@ -1,18 +1,16 @@
-import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
     Alert,
-    Image,
     Modal,
     Platform,
     Pressable,
     ScrollView,
     Text,
     TextInput,
-    TouchableOpacity,
     View
 } from "react-native";
+import { authService } from "../../lib/auth";
 import { deletePlan, deleteProfile, loadProfile, saveProfile, UserProfile } from "../../lib/profile";
 
 // Fonctions d'extraction et de nettoyage (copiées depuis le dashboard)
@@ -213,6 +211,14 @@ export default function Profile() {
     date: string;
   } | null>(null);
   const [showPlanDetail, setShowPlanDetail] = useState(false);
+  
+  // États pour la modal de compte
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [userEmail, setUserEmail] = useState('');
 
   useEffect(() => {
     loadUserProfile();
@@ -237,9 +243,10 @@ export default function Profile() {
   const loadUserProfile = async () => {
     try {
       const userProfile = await loadProfile();
+      console.log('📦 Profil chargé dans l\'écran profil:', userProfile?.saved_plans);
       setProfile(userProfile);
       if (userProfile) {
-        setFirstName(userProfile.firstName || "");
+        setFirstName(userProfile.first_name || "");
         setAge(userProfile.age?.toString() || "");
         setWeight(userProfile.weight?.toString() || "");
         setHeight(userProfile.height?.toString() || "");
@@ -249,16 +256,16 @@ export default function Profile() {
         setGoal(userProfile.goal || "");
         setSessions(userProfile.sessions?.toString() || "");
         setDiet(userProfile.diet || "");
-        setFitnessLevel(userProfile.chatResponses?.fitnessLevel || userProfile.fitnessLevel || "");
-        setEquipment(userProfile.chatResponses?.equipment || userProfile.equipment || "");
-        setIntolerances(userProfile.chatResponses?.intolerances || userProfile.intolerances || "");
-        setLimitations(userProfile.chatResponses?.limitations || userProfile.limitations || "");
-        setPreferredTime(userProfile.chatResponses?.preferredTime || userProfile.preferredTime || "");
+        setFitnessLevel(userProfile.chat_responses?.fitnessLevel || userProfile.fitness_level || "");
+        setEquipment(userProfile.chat_responses?.equipment || userProfile.equipment || "");
+        setIntolerances(userProfile.chat_responses?.intolerances || userProfile.intolerances || "");
+        setLimitations(userProfile.chat_responses?.limitations || userProfile.limitations || "");
+        setPreferredTime(userProfile.chat_responses?.preferredTime || userProfile.preferred_time || "");
         
         console.log("Profil chargé dans l'onglet profil:", userProfile);
-        console.log("Réponses du chat:", userProfile.chatResponses);
-        console.log("Horaires préférés - chatResponses:", userProfile.chatResponses?.preferredTime);
-        console.log("Horaires préférés - profile:", userProfile.preferredTime);
+        console.log("Réponses du chat:", userProfile.chat_responses);
+        console.log("Horaires préférés - chat_responses:", userProfile.chat_responses?.preferredTime);
+        console.log("Horaires préférés - profile:", userProfile.preferred_time);
       }
     } catch (error) {
       console.error("Erreur lors du chargement du profil:", error);
@@ -271,7 +278,7 @@ export default function Profile() {
     try {
       const updatedProfile = {
         ...profile,
-        firstName: firstName.trim() || undefined,
+        first_name: firstName.trim() || undefined,
         age: age ? parseInt(age) : undefined,
         weight: weight ? parseFloat(weight) : undefined,
         height: height ? parseFloat(height) : undefined,
@@ -297,11 +304,11 @@ export default function Profile() {
         goal: goal.trim() || profile.goal,
         sessions: sessions ? parseInt(sessions) : profile.sessions,
         diet: diet.trim() || profile.diet,
-        fitnessLevel: fitnessLevel.trim() as "Débutant" | "Intermédiaire" | "Avancé" || profile.fitnessLevel,
+        fitness_level: fitnessLevel.trim() as "Débutant" | "Intermédiaire" | "Avancé" || profile.fitness_level,
         equipment: equipment.trim() as "Aucun" | "Basique" | "Complet" || profile.equipment,
         intolerances: intolerances.trim() || profile.intolerances,
         limitations: limitations.trim() || profile.limitations,
-        preferredTime: preferredTime.trim() as "Matin" | "Midi" | "Soir" | "Flexible" || profile.preferredTime,
+        preferred_time: preferredTime.trim() as "Matin" | "Midi" | "Soir" | "Flexible" || profile.preferred_time,
       };
       
       await saveProfile(updatedProfile);
@@ -314,50 +321,7 @@ export default function Profile() {
     }
   };
 
-  const pickImage = async () => {
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
-      if (status !== 'granted') {
-        Alert.alert('Permission requise', 'Permission d\'accès à la galerie requise');
-        return;
-      }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        if (!profile) return;
-        
-        const updatedProfile = {
-          ...profile,
-          profilePhoto: result.assets[0].uri,
-        };
-        
-        await saveProfile(updatedProfile);
-        setProfile(updatedProfile);
-      }
-    } catch (error) {
-      console.error("Erreur lors de la sélection d'image:", error);
-      Alert.alert("Erreur", "Impossible de sélectionner l'image");
-    }
-  };
-
-  const removePhoto = async () => {
-    if (!profile) return;
-    
-    const updatedProfile = {
-      ...profile,
-      profilePhoto: undefined,
-    };
-    
-    await saveProfile(updatedProfile);
-    setProfile(updatedProfile);
-  };
 
   const openPlanDetail = (type: 'workout' | 'meal', plan: { id: string; title: string; content: string; date: string }) => {
     setSelectedPlan({
@@ -370,6 +334,203 @@ export default function Profile() {
     setShowPlanDetail(true);
   };
 
+  const deleteAllMeals = async () => {
+    if (!profile?.saved_plans?.meals?.length) {
+      Alert.alert("Aucun repas", "Il n'y a aucun repas à supprimer");
+      return;
+    }
+
+    Alert.alert(
+      "Supprimer tous les repas",
+      `Êtes-vous sûr de vouloir supprimer tous les ${profile.saved_plans.meals.length} repas enregistrés ? Cette action est irréversible.`,
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Supprimer tout",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const updatedProfile = {
+                ...profile,
+                saved_plans: {
+                  workouts: profile.saved_plans?.workouts || [],
+                  meals: []
+                }
+              };
+              
+              await saveProfile(updatedProfile);
+              setProfile(updatedProfile);
+              
+              // Synchroniser aussi avec lib/plans.ts
+              try {
+                const { listPlans, deletePlan } = await import('../../lib/plans');
+                const allPlans = await listPlans();
+                const mealPlans = allPlans.filter(plan => plan.type === 'meal');
+                
+                for (const mealPlan of mealPlans) {
+                  await deletePlan(mealPlan.id);
+                }
+                console.log(`✅ ${mealPlans.length} repas supprimés de lib/plans.ts`);
+              } catch (syncError) {
+                console.warn(`⚠️ Failed to sync deletion with lib/plans.ts:`, syncError);
+              }
+              
+            } catch (error) {
+              console.error("Erreur lors de la suppression des repas:", error);
+              Alert.alert("Erreur", "Impossible de supprimer les repas");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const deleteAllWorkouts = async () => {
+    if (!profile?.saved_plans?.workouts?.length) {
+      Alert.alert("Aucune séance", "Il n'y a aucune séance à supprimer");
+      return;
+    }
+
+    Alert.alert(
+      "Supprimer toutes les séances",
+      `Êtes-vous sûr de vouloir supprimer toutes les ${profile.saved_plans.workouts.length} séances enregistrées ? Cette action est irréversible.`,
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Supprimer tout",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const updatedProfile = {
+                ...profile,
+                saved_plans: {
+                  workouts: [],
+                  meals: profile.saved_plans?.meals || []
+                }
+              };
+              
+              await saveProfile(updatedProfile);
+              setProfile(updatedProfile);
+              
+              // Synchroniser aussi avec lib/plans.ts
+              try {
+                const { listPlans, deletePlan } = await import('../../lib/plans');
+                const allPlans = await listPlans();
+                const workoutPlans = allPlans.filter(plan => plan.type === 'workout');
+                
+                for (const workoutPlan of workoutPlans) {
+                  await deletePlan(workoutPlan.id);
+                }
+                console.log(`✅ ${workoutPlans.length} séances supprimées de lib/plans.ts`);
+              } catch (syncError) {
+                console.warn(`⚠️ Failed to sync deletion with lib/plans.ts:`, syncError);
+              }
+              
+            } catch (error) {
+              console.error("Erreur lors de la suppression des séances:", error);
+              Alert.alert("Erreur", "Impossible de supprimer les séances");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Fonctions pour la gestion du compte
+  const loadUserEmail = async () => {
+    try {
+      const { getSupabaseClient } = await import('../../lib/supabase');
+      const client = getSupabaseClient();
+      const { data: { user } } = await client.auth.getUser();
+      if (user?.email) {
+        setUserEmail(user.email);
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement de l\'email:', error);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!newPassword || !confirmPassword || !currentPassword) {
+      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Erreur', 'Les nouveaux mots de passe ne correspondent pas');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      Alert.alert('Erreur', 'Le nouveau mot de passe doit contenir au moins 6 caractères');
+      return;
+    }
+
+    try {
+      const result = await authService.changePassword(currentPassword, newPassword);
+      if (result.success) {
+        Alert.alert('Succès', 'Mot de passe modifié avec succès');
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        setShowChangePassword(false);
+      } else {
+        Alert.alert('Erreur', result.error || 'Impossible de modifier le mot de passe');
+      }
+    } catch (error) {
+      console.error('Erreur lors du changement de mot de passe:', error);
+      Alert.alert('Erreur', 'Une erreur est survenue');
+    }
+  };
+
+  const handleSignOut = () => {
+    Alert.alert(
+      'Déconnexion',
+      'Êtes-vous sûr de vouloir vous déconnecter ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Déconnexion',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await authService.signOut();
+              router.replace('/auth');
+            } catch (error) {
+              console.error('Erreur lors de la déconnexion:', error);
+              Alert.alert('Erreur', 'Impossible de se déconnecter');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Supprimer le compte',
+      'Cette action est irréversible. Toutes vos données seront définitivement supprimées.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Supprimer le profil local
+              await deleteProfile();
+              // Déconnexion
+              await authService.signOut();
+              router.replace('/auth');
+            } catch (error) {
+              console.error('Erreur lors de la suppression du compte:', error);
+              Alert.alert('Erreur', 'Impossible de supprimer le compte');
+            }
+          }
+        }
+      ]
+    );
+  };
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: "#000" }} contentContainerStyle={{ paddingTop: 60, paddingHorizontal: 16, paddingBottom: 20 }}>
@@ -377,75 +538,34 @@ export default function Profile() {
         <Text style={{ color: "#fff", fontSize: 24, fontWeight: "800" }}>
           Mon Profil
         </Text>
+        <Pressable
+          onPress={() => {
+            loadUserEmail();
+            setShowAccountModal(true);
+          }}
+          style={{
+            backgroundColor: "#1a1a1a",
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: "#333",
+            alignItems: "center",
+            justifyContent: "center"
+          }}
+        >
+          {/* Icône hamburger (3 barres) */}
+          <View style={{ flexDirection: "column", gap: 2 }}>
+            <View style={{ width: 16, height: 2, backgroundColor: "#fff", borderRadius: 1 }} />
+            <View style={{ width: 16, height: 2, backgroundColor: "#fff", borderRadius: 1 }} />
+            <View style={{ width: 16, height: 2, backgroundColor: "#fff", borderRadius: 1 }} />
+          </View>
+        </Pressable>
       </View>
       <Text style={{ color: "#aaa", marginBottom: 24 }}>
         Gère tes informations et préférences
       </Text>
 
-      {/* Section Photo de profil */}
-      <View style={{ 
-        backgroundColor: "#111", 
-        borderRadius: 16, 
-        padding: 20, 
-        marginBottom: 20,
-        alignItems: "center"
-      }}>
-        
-        <TouchableOpacity onPress={pickImage} style={{ marginBottom: 12 }}>
-          <View style={{
-            width: 100,
-            height: 100,
-            borderRadius: 50,
-            backgroundColor: "#222",
-            borderWidth: 2,
-            borderColor: "#333",
-            justifyContent: "center",
-            alignItems: "center",
-            overflow: "hidden"
-          }}>
-            {profile?.profilePhoto ? (
-              <Image 
-                source={{ uri: profile.profilePhoto }} 
-                style={{ width: 100, height: 100, borderRadius: 50 }}
-              />
-            ) : (
-              <Text style={{ color: "#666", fontSize: 24 }}>👤</Text>
-            )}
-          </View>
-        </TouchableOpacity>
-        
-        <View style={{ flexDirection: "row", gap: 12 }}>
-          <Pressable
-            onPress={pickImage}
-            style={{
-              backgroundColor: "#0070F3",
-              paddingHorizontal: 16,
-              paddingVertical: 8,
-              borderRadius: 8,
-            }}
-          >
-            <Text style={{ color: "#fff", fontWeight: "600", fontSize: 14 }}>
-              Changer
-            </Text>
-          </Pressable>
-          
-          {profile?.profilePhoto && (
-            <Pressable
-              onPress={removePhoto}
-              style={{
-                backgroundColor: "#ff4444",
-                paddingHorizontal: 16,
-                paddingVertical: 8,
-                borderRadius: 8,
-              }}
-            >
-              <Text style={{ color: "#fff", fontWeight: "600", fontSize: 14 }}>
-                Supprimer
-              </Text>
-            </Pressable>
-          )}
-        </View>
-      </View>
 
       {/* Section Informations personnelles */}
       <View style={{ 
@@ -580,7 +700,7 @@ export default function Profile() {
               />
             ) : (
               <Text style={{ color: "#fff", fontSize: 16, paddingVertical: 4 }}>
-                {profile?.firstName || "Non renseigné"}
+                {profile?.first_name || "Non renseigné"}
               </Text>
             )}
           </View>
@@ -974,7 +1094,7 @@ export default function Profile() {
               />
             ) : (
               <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600" }}>
-                {profile?.chatResponses?.fitnessLevel || profile?.fitnessLevel || "Non défini"}
+                {profile?.chat_responses?.fitnessLevel || profile?.fitness_level || "Non défini"}
               </Text>
             )}
           </View>
@@ -999,7 +1119,7 @@ export default function Profile() {
               />
             ) : (
               <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600" }}>
-                {profile?.chatResponses?.equipment || profile?.equipment || "Non défini"}
+                {profile?.chat_responses?.equipment || profile?.equipment || "Non défini"}
               </Text>
             )}
           </View>
@@ -1024,7 +1144,7 @@ export default function Profile() {
               />
             ) : (
               <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600" }}>
-                {profile?.chatResponses?.intolerances || profile?.intolerances || "Non défini"}
+                {profile?.chat_responses?.intolerances || profile?.intolerances || "Non défini"}
               </Text>
             )}
           </View>
@@ -1049,7 +1169,7 @@ export default function Profile() {
               />
             ) : (
               <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600" }}>
-                {profile?.chatResponses?.limitations || profile?.limitations || "Non défini"}
+                {profile?.chat_responses?.limitations || profile?.limitations || "Non défini"}
               </Text>
             )}
           </View>
@@ -1074,7 +1194,7 @@ export default function Profile() {
               />
             ) : (
               <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600" }}>
-                {profile?.chatResponses?.preferredTime || profile?.preferredTime || "Non défini"}
+                {profile?.chat_responses?.preferredTime || profile?.preferred_time || "Non défini"}
               </Text>
             )}
           </View>
@@ -1116,11 +1236,35 @@ export default function Profile() {
           
           {/* Séances sauvegardées */}
           <View style={{ marginBottom: 16 }}>
-            <Text style={{ color: "#60A5FA", fontSize: 16, fontWeight: "600", marginBottom: 8 }}>
-              Séances ({profile?.savedPlans?.workouts?.length || 0})
-            </Text>
-            {profile?.savedPlans?.workouts?.length ? (
-              profile.savedPlans.workouts.slice(-3).reverse().map((workout) => {
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <Text style={{ color: "#60A5FA", fontSize: 16, fontWeight: "600" }}>
+                Séances ({profile?.saved_plans?.workouts?.length || 0})
+              </Text>
+              {(profile?.saved_plans?.workouts?.length || 0) > 0 && (
+                <Pressable
+                  onPress={deleteAllWorkouts}
+                  style={{
+                    backgroundColor: "#2a1a1a",
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 6,
+                    borderWidth: 1,
+                    borderColor: "#4a2a2a"
+                  }}
+                >
+                  <Text style={{ color: "#ff6666", fontSize: 12, fontWeight: "600" }}>
+                    Tout supprimer
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+            {profile?.saved_plans?.workouts?.length ? (
+              <ScrollView 
+                style={{ maxHeight: 200 }}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled={true}
+              >
+                {profile.saved_plans.workouts.slice().reverse().map((workout) => {
                 const cleanedContent = cleanWorkoutContent(workout.content);
                 
                 return (
@@ -1205,7 +1349,8 @@ export default function Profile() {
                     </View>
                   </Pressable>
                 );
-              })
+                })}
+              </ScrollView>
             ) : (
               <View style={{ 
                 backgroundColor: "#1a1a1a", 
@@ -1225,11 +1370,35 @@ export default function Profile() {
           
           {/* Repas sauvegardés */}
           <View>
-            <Text style={{ color: "#3B82F6", fontSize: 16, fontWeight: "600", marginBottom: 8 }}>
-              Repas ({profile?.savedPlans?.meals?.length || 0})
-            </Text>
-            {profile?.savedPlans?.meals?.length ? (
-              profile.savedPlans.meals.slice(-3).reverse().map((meal) => {
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <Text style={{ color: "#3B82F6", fontSize: 16, fontWeight: "600" }}>
+                Repas ({profile?.saved_plans?.meals?.length || 0})
+              </Text>
+              {(profile?.saved_plans?.meals?.length || 0) > 0 && (
+                <Pressable
+                  onPress={deleteAllMeals}
+                  style={{
+                    backgroundColor: "#2a1a1a",
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 6,
+                    borderWidth: 1,
+                    borderColor: "#4a2a2a"
+                  }}
+                >
+                  <Text style={{ color: "#ff6666", fontSize: 12, fontWeight: "600" }}>
+                    Tout supprimer
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+            {profile?.saved_plans?.meals?.length ? (
+              <ScrollView 
+                style={{ maxHeight: 200 }}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled={true}
+              >
+                {profile.saved_plans.meals.slice().reverse().map((meal) => {
                 const mealType = getMealType(meal.content);
                 const extractedTitle = extractMealTitle(meal.content);
                 const cleanedContent = cleanMealContent(meal.content);
@@ -1320,7 +1489,8 @@ export default function Profile() {
                     </View>
                   </Pressable>
                 );
-              })
+                })}
+              </ScrollView>
             ) : (
               <View style={{ 
                 backgroundColor: "#1a1a1a", 
@@ -1445,6 +1615,249 @@ export default function Profile() {
               }}>
                 {selectedPlan?.content}
               </Text>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Modal de gestion du compte */}
+      <Modal
+        visible={showAccountModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowAccountModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: "#000" }}>
+          {/* Header de la modal */}
+          <View style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            paddingTop: 60,
+            paddingHorizontal: 20,
+            paddingBottom: 20,
+            borderBottomWidth: 1,
+            borderBottomColor: "#333"
+          }}>
+            <Text style={{ color: "#fff", fontSize: 20, fontWeight: "700" }}>
+              Mon compte
+            </Text>
+            <Pressable
+              onPress={() => setShowAccountModal(false)}
+              style={{
+                backgroundColor: "#1a1a1a",
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: "#333"
+              }}
+            >
+              <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600" }}>
+                Fermer
+              </Text>
+            </Pressable>
+          </View>
+
+          <ScrollView style={{ flex: 1, padding: 20 }}>
+            {/* Informations du compte */}
+            <View style={{
+              backgroundColor: "#111",
+              borderRadius: 16,
+              padding: 20,
+              marginBottom: 20
+            }}>
+              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700", marginBottom: 16 }}>
+                Informations du compte
+              </Text>
+              
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>
+                  Email
+                </Text>
+                <Text style={{ color: "#fff", fontSize: 16 }}>
+                  {userEmail || "Chargement..."}
+                </Text>
+              </View>
+            </View>
+
+            {/* Changer le mot de passe */}
+            <View style={{
+              backgroundColor: "#111",
+              borderRadius: 16,
+              padding: 20,
+              marginBottom: 20
+            }}>
+              <Pressable
+                onPress={() => setShowChangePassword(!showChangePassword)}
+                style={{
+                  backgroundColor: "#1a1a1a",
+                  padding: 16,
+                  borderRadius: 12,
+                  marginBottom: 12,
+                  borderWidth: 1,
+                  borderColor: "#333"
+                }}
+              >
+                <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600" }}>
+                  Changer le mot de passe
+                </Text>
+              </Pressable>
+
+              {/* Formulaire de changement de mot de passe */}
+              {showChangePassword && (
+                <View style={{
+                  backgroundColor: "#0a0a0a",
+                  padding: 16,
+                  borderRadius: 12,
+                  marginBottom: 12,
+                  borderWidth: 1,
+                  borderColor: "#333"
+                }}>
+                  <Text style={{ color: "#fff", fontSize: 14, marginBottom: 12 }}>
+                    Mot de passe actuel
+                  </Text>
+                  <TextInput
+                    style={{
+                      backgroundColor: "#1a1a1a",
+                      color: "#fff",
+                      padding: 12,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: "#333",
+                      marginBottom: 16
+                    }}
+                    value={currentPassword}
+                    onChangeText={setCurrentPassword}
+                    placeholder="Mot de passe actuel"
+                    secureTextEntry
+                    placeholderTextColor="#666"
+                  />
+
+                  <Text style={{ color: "#fff", fontSize: 14, marginBottom: 12 }}>
+                    Nouveau mot de passe
+                  </Text>
+                  <TextInput
+                    style={{
+                      backgroundColor: "#1a1a1a",
+                      color: "#fff",
+                      padding: 12,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: "#333",
+                      marginBottom: 16
+                    }}
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    placeholder="Nouveau mot de passe"
+                    secureTextEntry
+                    placeholderTextColor="#666"
+                  />
+
+                  <Text style={{ color: "#fff", fontSize: 14, marginBottom: 12 }}>
+                    Confirmer le nouveau mot de passe
+                  </Text>
+                  <TextInput
+                    style={{
+                      backgroundColor: "#1a1a1a",
+                      color: "#fff",
+                      padding: 12,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: "#333",
+                      marginBottom: 16
+                    }}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    placeholder="Confirmer le nouveau mot de passe"
+                    secureTextEntry
+                    placeholderTextColor="#666"
+                  />
+
+                  <View style={{ flexDirection: "row", gap: 12 }}>
+                    <Pressable
+                      onPress={handleChangePassword}
+                      style={{
+                        backgroundColor: "#0070F3",
+                        paddingHorizontal: 16,
+                        paddingVertical: 12,
+                        borderRadius: 8,
+                        flex: 1
+                      }}
+                    >
+                      <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600", textAlign: "center" }}>
+                        Modifier
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => {
+                        setShowChangePassword(false);
+                        setCurrentPassword('');
+                        setNewPassword('');
+                        setConfirmPassword('');
+                      }}
+                      style={{
+                        backgroundColor: "#333",
+                        paddingHorizontal: 16,
+                        paddingVertical: 12,
+                        borderRadius: 8,
+                        flex: 1
+                      }}
+                    >
+                      <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600", textAlign: "center" }}>
+                        Annuler
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+
+            </View>
+
+            {/* Déconnexion */}
+            <View style={{
+              backgroundColor: "#111",
+              borderRadius: 16,
+              padding: 20,
+              marginBottom: 20
+            }}>
+              <Pressable
+                onPress={handleSignOut}
+                style={{
+                  backgroundColor: "#2a1a1a",
+                  padding: 16,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: "#444"
+                }}
+              >
+                <Text style={{ color: "#ff6b6b", fontSize: 16, fontWeight: "600" }}>
+                  Se déconnecter
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Supprimer le compte */}
+            <View style={{
+              backgroundColor: "#111",
+              borderRadius: 16,
+              padding: 20,
+              marginBottom: 20
+            }}>
+              <Pressable
+                onPress={handleDeleteAccount}
+                style={{
+                  backgroundColor: "#2a1a1a",
+                  padding: 16,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: "#ff4444"
+                }}
+              >
+                <Text style={{ color: "#ff4444", fontSize: 16, fontWeight: "600" }}>
+                  Supprimer le compte
+                </Text>
+              </Pressable>
             </View>
           </ScrollView>
         </View>

@@ -1,5 +1,6 @@
 // lib/profile.ts
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { estimateMealNutrition } from './meal-nutrition';
 import { supabaseStorageAdapter as storageAdapter } from './storage-adapter-supabase';
 
 export type UserProfile = {
@@ -13,7 +14,6 @@ export type UserProfile = {
   weight?: number;       // Poids en kg
   height?: number;       // Taille en cm
   gender?: 'male' | 'female'; // Sexe de l'utilisateur
-  profile_photo?: string; // URI de la photo de profil (compatible Supabase)
   
   // Questions complémentaires du chat IA (réponses exactes)
   fitness_level?: string; // Compatible Supabase
@@ -159,13 +159,15 @@ export type Profile = {
 
 const KEY = "the_sport_profile_v1";
 
-// Sauvegarder le profil de l’utilisateur en local
+// Sauvegarder le profil de l'utilisateur en local
 export async function saveProfile(p: UserProfile) {
   try {
+    console.log(`💾 saveProfile called with saved_plans:`, p.saved_plans);
     // Utiliser le storage adapter avec fallback automatique
     await storageAdapter.save(KEY, p);
+    console.log(`✅ Profile saved successfully via storage adapter`);
   } catch (e) {
-    console.error("Erreur en sauvegardant le profil:", e);
+    console.error("❌ Erreur en sauvegardant le profil:", e);
     // Fallback vers AsyncStorage en cas d'erreur
     try {
       await AsyncStorage.setItem(KEY, JSON.stringify(p));
@@ -221,10 +223,16 @@ export async function deleteProfile(): Promise<void> {
 // Sauvegarder un plan (séance ou repas)
 export async function savePlan(type: 'workout' | 'meal', title: string, content: string): Promise<boolean> {
   try {
+    console.log(`🔄 savePlan called for ${type}:`, title);
+    
     const profile = await loadProfile();
-    if (!profile) return false;
+    if (!profile) {
+      console.log(`❌ No profile found for saving plan`);
+      return false;
+    }
 
     const savedPlans = profile.saved_plans || { workouts: [], meals: [] };
+    console.log(`📦 Current saved plans:`, savedPlans);
     
     const newPlan = {
       id: Date.now().toString(),
@@ -235,15 +243,35 @@ export async function savePlan(type: 'workout' | 'meal', title: string, content:
 
     if (type === 'workout') {
       savedPlans.workouts.push(newPlan);
+      console.log(`✅ Workout added to saved plans:`, newPlan);
     } else {
       savedPlans.meals.push(newPlan);
+      console.log(`✅ Meal added to saved plans:`, newPlan);
     }
 
     const updatedProfile = { ...profile, saved_plans: savedPlans };
+    console.log(`💾 Saving updated profile with plans:`, updatedProfile.saved_plans);
+    
     await saveProfile(updatedProfile);
+    console.log(`✅ Plan saved successfully`);
+    
+    // Synchroniser aussi avec lib/plans.ts pour maintenir la compatibilité
+    try {
+      const { addPlan } = await import('./plans');
+      await addPlan({
+        type,
+        title,
+        content
+      });
+      console.log(`✅ Plan also saved to lib/plans.ts for compatibility`);
+    } catch (syncError) {
+      console.warn(`⚠️ Failed to sync with lib/plans.ts:`, syncError);
+      // Ne pas faire échouer la sauvegarde principale
+    }
+    
     return true;
   } catch (e) {
-    console.error("Erreur en sauvegardant le plan:", e);
+    console.error("❌ Erreur en sauvegardant le plan:", e);
     return false;
   }
 }
@@ -276,6 +304,17 @@ export async function deletePlan(type: 'workout' | 'meal', planId: string): Prom
     const updatedProfile = { ...profile, saved_plans: savedPlans };
     await saveProfile(updatedProfile);
     console.log(`✅ deletePlan completed successfully for ${type}: ${planId}`);
+    
+    // Synchroniser aussi avec lib/plans.ts pour maintenir la compatibilité
+    try {
+      const { deletePlan: deletePlanFromLib } = await import('./plans');
+      await deletePlanFromLib(planId);
+      console.log(`✅ Plan also deleted from lib/plans.ts for compatibility`);
+    } catch (syncError) {
+      console.warn(`⚠️ Failed to sync deletion with lib/plans.ts:`, syncError);
+      // Ne pas faire échouer la suppression principale
+    }
+    
     return true;
   } catch (e) {
     console.error("Erreur en supprimant le plan:", e);
@@ -310,11 +349,18 @@ export async function saveDailyMeal(mealType: 'breakfast' | 'lunch' | 'snack' | 
       };
     }
 
-    // Sauvegarder le repas
-    profile.daily_meals[mealType] = meal;
+    // Calculer les calories du repas
+    const nutrition = estimateMealNutrition(meal.content, mealType);
+    const mealWithNutrition = {
+      ...meal,
+      nutrition: nutrition
+    };
+
+    // Sauvegarder le repas avec ses calories
+    profile.daily_meals[mealType] = mealWithNutrition;
     
     await saveProfile(profile);
-    console.log(`✅ Daily meal saved: ${mealType} - ${meal.title}`);
+    console.log(`✅ Daily meal saved: ${mealType} - ${meal.title} (${nutrition.calories} kcal)`);
     return true;
   } catch (e) {
     console.error("Erreur en sauvegardant le repas quotidien:", e);

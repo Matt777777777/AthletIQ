@@ -2,6 +2,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import React, { useEffect, useRef, useState } from "react";
 import { FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from "react-native";
 import { checkAndResetDailyChat, loadChatMessages, Message, saveChatMessages } from "../lib/chat";
+import { estimateMealNutrition } from "../lib/meal-nutrition";
 import { estimateKcalTarget } from "../lib/nutrition";
 import { loadProfile, saveDailyMeal, savePlan, saveProfile, UserProfile } from "../lib/profile";
 import { addShoppingItem, extractIngredientsFromAIResponse } from "../lib/shopping";
@@ -286,11 +287,11 @@ export default function Chat() {
 
     // Détection du niveau de sport
     if (lowerText.includes('débutant') || lowerText.includes('debutant')) {
-      updates.fitnessLevel = "Débutant";
+      updates.fitness_level = "Débutant";
     } else if (lowerText.includes('intermédiaire') || lowerText.includes('intermediaire')) {
-      updates.fitnessLevel = "Intermédiaire";
+      updates.fitness_level = "Intermédiaire";
     } else if (lowerText.includes('avancé') || lowerText.includes('avance')) {
-      updates.fitnessLevel = "Avancé";
+      updates.fitness_level = "Avancé";
     }
 
     // Détection du matériel
@@ -329,13 +330,13 @@ export default function Chat() {
 
     // Détection des horaires préférés
     if (lowerText.includes('matin')) {
-      updates.preferredTime = "Matin";
+      updates.preferred_time = "Matin";
     } else if (lowerText.includes('midi')) {
-      updates.preferredTime = "Midi";
+      updates.preferred_time = "Midi";
     } else if (lowerText.includes('soir')) {
-      updates.preferredTime = "Soir";
+      updates.preferred_time = "Soir";
     } else if (lowerText.includes('flexible') || lowerText.includes('n\'importe')) {
-      updates.preferredTime = "Flexible";
+      updates.preferred_time = "Flexible";
     }
 
     return updates;
@@ -376,8 +377,8 @@ export default function Chat() {
             setCurrentQuestionIndex(0);
           } else {
             // Profil complet, message d'accueil personnalisé
-            const welcomeMessage = loadedProfile.firstName 
-              ? `Salut ${loadedProfile.firstName} ! Je suis ton coach IA. Je connais ton profil et je vais adapter toutes mes réponses à tes besoins. Pose-moi une question !`
+            const welcomeMessage = loadedProfile.first_name 
+              ? `Salut ${loadedProfile.first_name} ! Je suis ton coach IA. Je connais ton profil et je vais adapter toutes mes réponses à tes besoins. Pose-moi une question !`
               : "Salut ! Je suis ton coach IA. Je connais ton profil et je vais adapter toutes mes réponses à tes besoins. Pose-moi une question !";
             
             setMessages([
@@ -477,7 +478,7 @@ export default function Chat() {
     const profileUpdates = extractProfileInfo(answer);
     
     // Enregistrer la réponse exacte selon la question actuelle
-    const questionKeys = ['fitnessLevel', 'equipment', 'intolerances', 'limitations', 'preferredTime'];
+    const questionKeys = ['fitness_level', 'equipment', 'intolerances', 'limitations', 'preferred_time'];
     const currentQuestionKey = questionKeys[currentQuestionIndex];
     
     // Créer ou mettre à jour les réponses exactes
@@ -585,8 +586,8 @@ export default function Chat() {
         systemPrompt += "\n\nINFORMATIONS UTILISATEUR (à utiliser pour personnaliser tes réponses) :";
         
         // Informations personnelles
-        if (profile.firstName) {
-          systemPrompt += `\n- Prénom: ${profile.firstName}`;
+        if (profile.first_name) {
+          systemPrompt += `\n- Prénom: ${profile.first_name}`;
         }
         if (profile.gender) {
           systemPrompt += `\n- Sexe: ${profile.gender === "male" ? "Homme" : "Femme"}`;
@@ -615,8 +616,8 @@ export default function Chat() {
         systemPrompt += `\n- Dîner: ${dinnerKcal} kcal (25%)`;
         
         // Informations complémentaires (valeurs extraites)
-        if (profile.fitnessLevel) {
-          systemPrompt += `\n- Niveau de sport: ${profile.fitnessLevel}`;
+        if (profile.fitness_level) {
+          systemPrompt += `\n- Niveau de sport: ${profile.fitness_level}`;
         }
         if (profile.equipment) {
           systemPrompt += `\n- Matériel disponible: ${profile.equipment}`;
@@ -627,27 +628,27 @@ export default function Chat() {
         if (profile.limitations) {
           systemPrompt += `\n- Limitations physiques: ${profile.limitations}`;
         }
-        if (profile.preferredTime) {
-          systemPrompt += `\n- Horaires préférés: ${profile.preferredTime}`;
+        if (profile.preferred_time) {
+          systemPrompt += `\n- Horaires préférés: ${profile.preferred_time}`;
         }
 
         // Réponses exactes du chat (pour plus de contexte)
-        if (profile.chatResponses) {
+        if (profile.chat_responses) {
           systemPrompt += "\n\nRÉPONSES EXACTES DE L'UTILISATEUR (pour mieux comprendre ses besoins) :";
-          if (profile.chatResponses.fitnessLevel) {
-            systemPrompt += `\n- Niveau de sport (réponse exacte): "${profile.chatResponses.fitnessLevel}"`;
+          if (profile.chat_responses.fitnessLevel) {
+            systemPrompt += `\n- Niveau de sport (réponse exacte): "${profile.chat_responses.fitnessLevel}"`;
           }
-          if (profile.chatResponses.equipment) {
-            systemPrompt += `\n- Matériel (réponse exacte): "${profile.chatResponses.equipment}"`;
+          if (profile.chat_responses.equipment) {
+            systemPrompt += `\n- Matériel (réponse exacte): "${profile.chat_responses.equipment}"`;
           }
-          if (profile.chatResponses.intolerances) {
-            systemPrompt += `\n- Intolérances (réponse exacte): "${profile.chatResponses.intolerances}"`;
+          if (profile.chat_responses.intolerances) {
+            systemPrompt += `\n- Intolérances (réponse exacte): "${profile.chat_responses.intolerances}"`;
           }
-          if (profile.chatResponses.limitations) {
-            systemPrompt += `\n- Limitations (réponse exacte): "${profile.chatResponses.limitations}"`;
+          if (profile.chat_responses.limitations) {
+            systemPrompt += `\n- Limitations (réponse exacte): "${profile.chat_responses.limitations}"`;
           }
-          if (profile.chatResponses.preferredTime) {
-            systemPrompt += `\n- Horaires (réponse exacte): "${profile.chatResponses.preferredTime}"`;
+          if (profile.chat_responses.preferredTime) {
+            systemPrompt += `\n- Horaires (réponse exacte): "${profile.chat_responses.preferredTime}"`;
           }
         }
         
@@ -696,10 +697,10 @@ export default function Chat() {
         
         // Instructions spécifiques pour les séances de sport
         systemPrompt += "\n\nINSTRUCTIONS SPÉCIFIQUES POUR LES SÉANCES DE SPORT:";
-        systemPrompt += `\n- Adapte la difficulté selon le niveau: ${profile.fitnessLevel}`;
+        systemPrompt += `\n- Adapte la difficulté selon le niveau: ${profile.fitness_level}`;
         systemPrompt += `\n- Utilise uniquement le matériel disponible: ${profile.equipment}`;
         systemPrompt += `\n- Respecte les limitations: ${profile.limitations || 'aucune'}`;
-        systemPrompt += `\n- Propose des exercices adaptés aux horaires: ${profile.preferredTime}`;
+        systemPrompt += `\n- Propose des exercices adaptés aux horaires: ${profile.preferred_time}`;
         systemPrompt += `\n- Inclus échauffement, exercices principaux et récupération`;
         systemPrompt += `\n- Précise les répétitions, séries et temps de repos`;
         systemPrompt += `\n- Adapte l'intensité selon l'objectif: ${profile.goal}`;
@@ -1003,12 +1004,17 @@ export default function Chat() {
                       let savedCount = 0;
                       
                       for (const meal of meals) {
-                        const success = await saveDailyMeal(meal.type as 'breakfast' | 'lunch' | 'snack' | 'dinner', {
+                        // Calculer les calories du repas généré
+                        const nutrition = estimateMealNutrition(meal.content, meal.type as 'breakfast' | 'lunch' | 'snack' | 'dinner');
+                        const mealWithNutrition = {
                           id: `${meal.type}_${Date.now()}_${Math.random()}`,
                           title: meal.title,
                           content: meal.content,
-                          date: new Date().toISOString()
-                        });
+                          date: new Date().toISOString(),
+                          nutrition: nutrition
+                        };
+
+                        const success = await saveDailyMeal(meal.type as 'breakfast' | 'lunch' | 'snack' | 'dinner', mealWithNutrition);
                         if (success) savedCount++;
                       }
                       

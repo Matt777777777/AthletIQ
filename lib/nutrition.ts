@@ -9,6 +9,13 @@ export type DailyIntake = {
   kcal: number;
 };
 
+export type MealNutrition = {
+  calories: number;
+  carbs: number;
+  protein: number;
+  fat: number;
+};
+
 /**
  * Calcule le métabolisme de base (BMR) avec la formule de Mifflin-St Jeor
  */

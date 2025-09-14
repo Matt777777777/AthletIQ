@@ -339,6 +339,13 @@ class SupabaseStorageAdapter {
       
       if (insertError) throw insertError;
     }
+
+    // Sauvegarder aussi les plans dans la table saved_plans si ils existent
+    if (profile.saved_plans) {
+      console.log(`💾 Saving plans to Supabase:`, profile.saved_plans);
+      await this.savePlansToSupabase(userId, profile.saved_plans);
+      console.log(`✅ Plans saved to Supabase successfully`);
+    }
   }
 
   private async loadProfileFromSupabase(userId: string): Promise<any> {
@@ -351,6 +358,49 @@ class SupabaseStorageAdapter {
 
     if (error) throw error;
     if (!data) return null;
+
+    // Charger les plans depuis la table saved_plans
+    console.log(`🔄 Loading plans from Supabase for user: ${userId}`);
+    const { data: plansData, error: plansError } = await client
+      .from('saved_plans')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (plansError) {
+      console.warn('❌ Erreur chargement plans:', plansError);
+    } else {
+      console.log(`📦 Plans loaded from Supabase:`, plansData);
+    }
+
+    // Organiser les plans par type
+    const savedPlans: {
+      workouts: Array<{ id: string; title: string; content: string; date: string }>;
+      meals: Array<{ id: string; title: string; content: string; date: string }>;
+    } = {
+      workouts: [],
+      meals: []
+    };
+
+    if (plansData) {
+      plansData.forEach((plan: any) => {
+        if (plan.type === 'workout') {
+          savedPlans.workouts.push({
+            id: plan.id,
+            title: plan.title,
+            content: plan.content,
+            date: plan.created_at
+          });
+        } else if (plan.type === 'meal') {
+          savedPlans.meals.push({
+            id: plan.id,
+            title: plan.title,
+            content: plan.content,
+            date: plan.created_at
+          });
+        }
+      });
+    }
 
     // Convertir le format Supabase vers le format AsyncStorage
     return {
@@ -373,69 +423,87 @@ class SupabaseStorageAdapter {
       daily_meals: data.daily_meals,
       daily_workout: data.daily_workout,
       daily_history: data.daily_history,
-      saved_plans: data.saved_plans,
+      saved_plans: savedPlans,
     };
   }
 
   // Méthodes spécifiques pour les plans
   private async savePlansToSupabase(userId: string, plans: any): Promise<void> {
-    if (!plans || (!plans.workouts && !plans.meals)) {
-      console.log('Aucun plan à sauvegarder');
-      return;
-    }
+    try {
+      console.log(`🔄 savePlansToSupabase called with:`, plans);
+      
+      if (!plans || (!plans.workouts && !plans.meals)) {
+        console.log('Aucun plan à sauvegarder');
+        return;
+      }
 
-    const client = getSupabaseClient();
-    
-    // Supprimer les anciens plans de l'utilisateur
-    const { error: deleteError } = await client
-      .from('saved_plans')
-      .delete()
-      .eq('user_id', userId);
+      const client = getSupabaseClient();
+      
+      // Supprimer les anciens plans de l'utilisateur
+      console.log(`🗑️ Deleting old plans for user: ${userId}`);
+      const { error: deleteError } = await client
+        .from('saved_plans')
+        .delete()
+        .eq('user_id', userId);
 
-    if (deleteError) {
-      console.warn('Erreur suppression anciens plans:', deleteError);
-    }
+      if (deleteError) {
+        console.warn('❌ Erreur suppression anciens plans:', deleteError);
+        // Ne pas throw l'erreur, continuer avec l'insertion
+      } else {
+        console.log('✅ Anciens plans supprimés');
+      }
 
-    // Préparer tous les plans à insérer
-    const plansToInsert: any[] = [];
+      // Préparer tous les plans à insérer
+      const plansToInsert: any[] = [];
 
-    // Ajouter les séances de sport
-    if (plans.workouts && Array.isArray(plans.workouts)) {
-      plans.workouts.forEach((workout: any) => {
-        plansToInsert.push({
-          user_id: userId,
-          type: 'workout',
-          title: workout.title,
-          content: workout.content,
-          created_at: workout.date || new Date().toISOString(),
+      // Ajouter les séances de sport
+      if (plans.workouts && Array.isArray(plans.workouts)) {
+        console.log(`📝 Adding ${plans.workouts.length} workouts`);
+        plans.workouts.forEach((workout: any) => {
+          plansToInsert.push({
+            user_id: userId,
+            type: 'workout',
+            title: workout.title,
+            content: workout.content,
+            created_at: workout.date || new Date().toISOString(),
+          });
         });
-      });
-    }
+      }
 
-    // Ajouter les repas
-    if (plans.meals && Array.isArray(plans.meals)) {
-      plans.meals.forEach((meal: any) => {
-        plansToInsert.push({
-          user_id: userId,
-          type: 'meal',
-          title: meal.title,
-          content: meal.content,
-          created_at: meal.date || new Date().toISOString(),
+      // Ajouter les repas
+      if (plans.meals && Array.isArray(plans.meals)) {
+        console.log(`🍽️ Adding ${plans.meals.length} meals`);
+        plans.meals.forEach((meal: any) => {
+          plansToInsert.push({
+            user_id: userId,
+            type: 'meal',
+            title: meal.title,
+            content: meal.content,
+            created_at: meal.date || new Date().toISOString(),
+          });
         });
-      });
+      }
+
+      if (plansToInsert.length === 0) {
+        console.log('Aucun plan valide à sauvegarder');
+        return;
+      }
+
+      console.log(`💾 Inserting ${plansToInsert.length} plans to Supabase:`, plansToInsert);
+      const { error: insertError } = await client
+        .from('saved_plans')
+        .insert(plansToInsert);
+
+      if (insertError) {
+        console.error('❌ Erreur insertion plans:', insertError);
+        throw insertError;
+      }
+      
+      console.log(`✅ ${plansToInsert.length} plans sauvegardés dans Supabase`);
+    } catch (error) {
+      console.error('❌ Erreur dans savePlansToSupabase:', error);
+      throw error;
     }
-
-    if (plansToInsert.length === 0) {
-      console.log('Aucun plan valide à sauvegarder');
-      return;
-    }
-
-    const { error: insertError } = await client
-      .from('saved_plans')
-      .insert(plansToInsert);
-
-    if (insertError) throw insertError;
-    console.log(`✅ ${plansToInsert.length} plans sauvegardés dans Supabase`);
   }
 
   private async loadPlansFromSupabase(userId: string): Promise<any> {

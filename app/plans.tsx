@@ -2,7 +2,8 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Pressable, ScrollView, Text, View } from "react-native";
-import { deletePlan, listPlans, SavedPlan } from "../lib/plans";
+import { listPlans, SavedPlan } from "../lib/plans";
+import { loadProfile } from "../lib/profile";
 import { synthesizeWorkout } from "../lib/synthesis";
 
 type Tab = "workout" | "meal" | "all";
@@ -13,8 +14,61 @@ export default function Plans() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const all = await listPlans();
-    setPlans(all);
+    try {
+      // Charger depuis le profil (source principale)
+      const profile = await loadProfile();
+      if (profile?.saved_plans) {
+        const allPlans: SavedPlan[] = [];
+        
+        // Convertir les workouts du profil
+        if (profile.saved_plans.workouts) {
+          profile.saved_plans.workouts.forEach(workout => {
+            allPlans.push({
+              id: workout.id,
+              type: 'workout' as const,
+              title: workout.title,
+              content: workout.content,
+              dateISO: workout.date
+            });
+          });
+        }
+        
+        // Convertir les meals du profil
+        if (profile.saved_plans.meals) {
+          profile.saved_plans.meals.forEach(meal => {
+            allPlans.push({
+              id: meal.id,
+              type: 'meal' as const,
+              title: meal.title,
+              content: meal.content,
+              dateISO: meal.date
+            });
+          });
+        }
+        
+        // Trier par date (plus récent en premier)
+        allPlans.sort((a, b) => new Date(b.dateISO).getTime() - new Date(a.dateISO).getTime());
+        
+        console.log(`📦 Plans chargés depuis le profil: ${allPlans.length} plans`);
+        setPlans(allPlans);
+        return;
+      }
+      
+      // Fallback vers lib/plans.ts si pas de données dans le profil
+      console.log(`📦 Fallback vers lib/plans.ts`);
+      const all = await listPlans();
+      setPlans(all);
+    } catch (error) {
+      console.error("❌ Erreur lors du chargement des plans:", error);
+      // Fallback vers lib/plans.ts en cas d'erreur
+      try {
+        const all = await listPlans();
+        setPlans(all);
+      } catch (fallbackError) {
+        console.error("❌ Erreur fallback:", fallbackError);
+        setPlans([]);
+      }
+    }
   }, []);
 
   // Recharge quand l’écran reprend le focus (retour depuis Chat/Dashboard)
@@ -32,9 +86,16 @@ export default function Plans() {
     // Optimistic update
     setDeletingId(id);
     const prev = plans;
+    const planToDelete = plans.find(p => p.id === id);
     setPlans((cur) => cur.filter((p) => p.id !== id));
+    
     try {
-      await deletePlan(id);
+      if (planToDelete) {
+        // Supprimer depuis le profil (source principale)
+        const { deletePlan: deleteFromProfile } = await import('../lib/profile');
+        await deleteFromProfile(planToDelete.type, id);
+        console.log(`✅ Plan supprimé depuis le profil: ${id}`);
+      }
     } catch (e) {
       // rollback si échec
       setPlans(prev);
