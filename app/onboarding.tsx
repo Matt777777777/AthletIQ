@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { authService } from "../lib/auth";
+import { theme } from "../theme";
 
 const goals = ["Perdre du poids", "Prendre du muscle", "Être en forme"];
 const diets = ["Végétarien", "Vegan", "Sans gluten", "Aucune restriction"];
@@ -66,12 +67,20 @@ export default function Onboarding() {
 
   return (
     <KeyboardAvoidingView 
-      style={{ flex: 1, backgroundColor: "#000" }} 
+      style={{ flex: 1, backgroundColor: theme.colors.background }} 
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
     >
-      <View style={{ flex: 1, paddingTop: 80, paddingHorizontal: 20 }}>
-      <Text style={{ color: "#fff", fontSize: 28, fontWeight: "800", marginBottom: 16 }}>
+      <View style={{ 
+        flex: 1, 
+        paddingTop: 80, 
+        paddingHorizontal: theme.spacing.lg 
+      }}>
+      <Text style={{ 
+        color: theme.colors.text, 
+        ...theme.typography.h1, 
+        marginBottom: theme.spacing.md 
+      }}>
         Onboarding
       </Text>
         
@@ -83,8 +92,12 @@ export default function Onboarding() {
         >
 
       {step === 1 && (
-        <View style={{ gap: 12 }}>
-          <Text style={{ color: "#fff", fontSize: 20, fontWeight: "700", marginBottom: 8 }}>
+        <View style={{ gap: theme.spacing.sm }}>
+          <Text style={{ 
+            color: theme.colors.text, 
+            ...theme.typography.h3, 
+            marginBottom: theme.spacing.xs 
+          }}>
             Quel est ton objectif ?
           </Text>
           {goals.map((g) => (
@@ -92,43 +105,52 @@ export default function Onboarding() {
               key={g}
               onPress={() => setGoal(g)}
               style={{
-                backgroundColor: goal === g ? "#0070F3" : "#111",
+                backgroundColor: goal === g ? theme.colors.primary : theme.colors.surface,
                 borderWidth: 1,
-                borderColor: "#222",
-                padding: 16,
-                borderRadius: 12,
+                borderColor: theme.colors.border,
+                padding: theme.spacing.md,
+                borderRadius: theme.borderRadius.lg,
               }}
             >
-              <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600" }}>{g}</Text>
+              <Text style={{ 
+                color: theme.colors.text, 
+                ...theme.typography.body 
+              }}>{g}</Text>
             </Pressable>
           ))}
         </View>
       )}
 
       {step === 2 && (
-        <View style={{ gap: 16 }}>
-          <Text style={{ color: "#fff", fontSize: 20, fontWeight: "700" }}>
+        <View style={{ gap: theme.spacing.md }}>
+          <Text style={{ 
+            color: theme.colors.text, 
+            ...theme.typography.h3 
+          }}>
             Combien de séances par semaine ?
           </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
-            {Array.from({ length: 6 }).map((_, i) => {
-              const val = i + 2; // 2 → 7
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: theme.spacing.xs }}>
+            {Array.from({ length: 5 }).map((_, i) => {
+              const val = i + 2; // 2 → 6 (suppression de l'option 7)
               const active = sessions === val;
               return (
                 <Pressable
                   key={val}
                   onPress={() => setSessions(val)}
                   style={{
-                    marginRight: 10,
-                    backgroundColor: active ? "#0070F3" : "#111",
+                    marginRight: theme.spacing.sm,
+                    backgroundColor: active ? theme.colors.primary : theme.colors.surface,
                     borderWidth: 1,
-                    borderColor: "#222",
-                    paddingVertical: 14,
-                    paddingHorizontal: 22,
-                    borderRadius: 12,
+                    borderColor: theme.colors.border,
+                    paddingVertical: theme.spacing.sm,
+                    paddingHorizontal: theme.spacing.lg,
+                    borderRadius: theme.borderRadius.lg,
                   }}
                 >
-                  <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>{val}</Text>
+                  <Text style={{ 
+                    color: theme.colors.text, 
+                    ...theme.typography.h4 
+                  }}>{val}</Text>
                 </Pressable>
               );
             })}
@@ -137,8 +159,12 @@ export default function Onboarding() {
       )}
 
       {step === 3 && (
-        <View style={{ gap: 12 }}>
-          <Text style={{ color: "#fff", fontSize: 20, fontWeight: "700", marginBottom: 8 }}>
+        <View style={{ gap: theme.spacing.sm }}>
+          <Text style={{ 
+            color: theme.colors.text, 
+            ...theme.typography.h3, 
+            marginBottom: theme.spacing.xs 
+          }}>
             Préférences alimentaires
           </Text>
           {diets.map((d) => (
@@ -146,140 +172,154 @@ export default function Onboarding() {
               key={d}
               onPress={() => setDiet(d)}
               style={{
-                backgroundColor: diet === d ? "#0070F3" : "#111",
+                backgroundColor: diet === d ? theme.colors.primary : theme.colors.surface,
                 borderWidth: 1,
-                borderColor: "#222",
-                padding: 16,
-                borderRadius: 12,
+                borderColor: theme.colors.border,
+                padding: theme.spacing.md,
+                borderRadius: theme.borderRadius.lg,
               }}
             >
-              <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600" }}>{d}</Text>
+              <Text style={{ 
+                color: theme.colors.text, 
+                ...theme.typography.body 
+              }}>{d}</Text>
             </Pressable>
           ))}
         </View>
       )}
 
       {step === 4 && (
-        <View style={{ gap: 20 }}>
-          <Text style={{ color: "#fff", fontSize: 20, fontWeight: "700", marginBottom: 8 }}>
+        <View style={{ gap: theme.spacing.lg }}>
+          <Text style={{ 
+            color: theme.colors.text, 
+            ...theme.typography.h3, 
+            marginBottom: theme.spacing.xs 
+          }}>
             Quelques infos sur toi
           </Text>
           
-          <View style={{ gap: 16 }}>
+          <View style={{ gap: theme.spacing.md }}>
             <View>
-              <Text style={{ color: "#aaa", fontSize: 16, marginBottom: 8 }}>
+              <Text style={{ 
+                color: theme.colors.textSecondary, 
+                ...theme.typography.body, 
+                marginBottom: theme.spacing.xs 
+              }}>
                 Ton sexe
               </Text>
-              <View style={{ flexDirection: "row", gap: 12 }}>
+              <View style={{ 
+                flexDirection: "row", 
+                gap: theme.spacing.sm 
+              }}>
                 {genders.map((g) => (
                   <Pressable
                     key={g}
                     onPress={() => setGender(g)}
                     style={{
                       flex: 1,
-                      backgroundColor: gender === g ? "#0070F3" : "#111",
+                      backgroundColor: gender === g ? theme.colors.primary : theme.colors.surface,
                       borderWidth: 1,
-                      borderColor: gender === g ? "#0070F3" : "#222",
-                      padding: 16,
-                      borderRadius: 12,
+                      borderColor: gender === g ? theme.colors.primary : theme.colors.border,
+                      padding: theme.spacing.md,
+                      borderRadius: theme.borderRadius.lg,
                       alignItems: "center",
                     }}
                   >
-                    <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600" }}>{g}</Text>
+                    <Text style={{ 
+                      color: theme.colors.text, 
+                      ...theme.typography.body 
+                    }}>{g}</Text>
                   </Pressable>
                 ))}
               </View>
             </View>
 
             <View>
-              <Text style={{ color: "#aaa", fontSize: 16, marginBottom: 8 }}>
+              <Text style={{ 
+                color: theme.colors.textSecondary, 
+                ...theme.typography.body, 
+                marginBottom: theme.spacing.xs 
+              }}>
                 Ton prénom
               </Text>
               <TextInput
                 value={firstName}
                 onChangeText={setFirstName}
                 placeholder="Ex: Marie"
-                placeholderTextColor="#666"
+                placeholderTextColor={theme.colors.textTertiary}
                 style={{
-                  backgroundColor: "#111",
-                  borderWidth: 1,
-                  borderColor: "#222",
-                  padding: 16,
-                  borderRadius: 12,
-                  color: "#fff",
-                  fontSize: 16,
+                  ...theme.input,
                 }}
               />
             </View>
 
             <View>
-              <Text style={{ color: "#aaa", fontSize: 16, marginBottom: 8 }}>
+              <Text style={{ 
+                color: theme.colors.textSecondary, 
+                ...theme.typography.body, 
+                marginBottom: theme.spacing.xs 
+              }}>
                 Ton âge
               </Text>
               <TextInput
                 value={age}
                 onChangeText={setAge}
                 placeholder="Ex: 25"
-                placeholderTextColor="#666"
+                placeholderTextColor={theme.colors.textTertiary}
                 keyboardType="numeric"
                 style={{
-                  backgroundColor: "#111",
-                  borderWidth: 1,
-                  borderColor: "#222",
-                  padding: 16,
-                  borderRadius: 12,
-                  color: "#fff",
-                  fontSize: 16,
+                  ...theme.input,
                 }}
               />
             </View>
 
             <View>
-              <Text style={{ color: "#aaa", fontSize: 16, marginBottom: 8 }}>
+              <Text style={{ 
+                color: theme.colors.textSecondary, 
+                ...theme.typography.body, 
+                marginBottom: theme.spacing.xs 
+              }}>
                 Ton poids (kg)
               </Text>
               <TextInput
                 value={weight}
                 onChangeText={setWeight}
                 placeholder="Ex: 70"
-                placeholderTextColor="#666"
+                placeholderTextColor={theme.colors.textTertiary}
                 keyboardType="numeric"
                 style={{
-                  backgroundColor: "#111",
-                  borderWidth: 1,
-                  borderColor: "#222",
-                  padding: 16,
-                  borderRadius: 12,
-                  color: "#fff",
-                  fontSize: 16,
+                  ...theme.input,
                 }}
               />
             </View>
 
             <View>
-              <Text style={{ color: "#aaa", fontSize: 16, marginBottom: 8 }}>
+              <Text style={{ 
+                color: theme.colors.textSecondary, 
+                ...theme.typography.body, 
+                marginBottom: theme.spacing.xs 
+              }}>
                 Ta taille (cm)
               </Text>
               <TextInput
                 value={height}
                 onChangeText={setHeight}
                 placeholder="Ex: 175"
-                placeholderTextColor="#666"
+                placeholderTextColor={theme.colors.textTertiary}
                 keyboardType="numeric"
                 style={{
-                  backgroundColor: "#111",
-                  borderWidth: 1,
-                  borderColor: "#222",
-                  padding: 16,
-                  borderRadius: 12,
-                  color: "#fff",
-                  fontSize: 16,
+                  ...theme.input,
                 }}
               />
             </View>
           </View>
 
-          <Text style={{ color: "#666", fontSize: 14, textAlign: "center", marginTop: 8 }}>
+          <Text style={{ 
+            color: theme.colors.textTertiary, 
+            ...theme.typography.caption, 
+            textAlign: "center", 
+            marginTop: theme.spacing.xs 
+          }}>
             Ces informations nous aideront à personnaliser tes recommandations. 
             Tu pourras les modifier plus tard dans ton profil.
           </Text>
@@ -287,19 +327,22 @@ export default function Onboarding() {
       )}
         </ScrollView>
 
-        <View style={{ paddingVertical: 24 }}>
+        <View style={{ paddingVertical: theme.spacing.lg }}>
         <Pressable
           onPress={next}
           disabled={(step === 1 && !goal) || (step === 3 && !diet)}
           style={{
             backgroundColor:
-              (step === 1 && !goal) || (step === 3 && !diet) ? "#333" : "#0070F3",
-            paddingVertical: 16,
-            borderRadius: 14,
+              (step === 1 && !goal) || (step === 3 && !diet) ? theme.colors.surface : theme.colors.primary,
+            paddingVertical: theme.spacing.md,
+            borderRadius: theme.borderRadius.lg,
             alignItems: "center",
           }}
         >
-          <Text style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>
+          <Text style={{ 
+            color: theme.colors.text, 
+            ...theme.typography.button 
+          }}>
               {step < 4 ? "Continuer" : "Terminer"}
           </Text>
         </Pressable>
@@ -307,9 +350,14 @@ export default function Onboarding() {
         {step > 1 && (
           <Pressable
               onPress={() => setStep((s) => (s - 1) as 1 | 2 | 3 | 4)}
-            style={{ paddingVertical: 14, alignItems: "center" }}
+            style={{ 
+              paddingVertical: theme.spacing.sm, 
+              alignItems: "center" 
+            }}
           >
-            <Text style={{ color: "#aaa" }}>Retour</Text>
+            <Text style={{ 
+              color: theme.colors.textSecondary 
+            }}>Retour</Text>
           </Pressable>
         )}
       </View>
