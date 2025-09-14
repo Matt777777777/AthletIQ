@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { authService } from "../../lib/auth";
 import { deletePlan, deleteProfile, loadProfile, saveProfile, UserProfile } from "../../lib/profile";
+import { theme } from "../../theme";
 
 // Fonctions d'extraction et de nettoyage (copiées depuis le dashboard)
 const extractMealTitle = (content: string): string => {
@@ -658,9 +659,21 @@ export default function Profile() {
   };
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: "#000" }} contentContainerStyle={{ paddingTop: 60, paddingHorizontal: 16, paddingBottom: 20 }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <Text style={{ color: "#fff", fontSize: 24, fontWeight: "800" }}>
+    <ScrollView style={{ flex: 1, backgroundColor: theme.colors.background }} contentContainerStyle={{ 
+      paddingTop: 60, 
+      paddingHorizontal: theme.spacing.md, 
+      paddingBottom: theme.spacing.lg 
+    }}>
+      <View style={{ 
+        flexDirection: "row", 
+        justifyContent: "space-between", 
+        alignItems: "center", 
+        marginBottom: theme.spacing.xs 
+      }}>
+        <Text style={{ 
+          color: theme.colors.text, 
+          ...theme.typography.h2 
+        }}>
           Mon Profil
         </Text>
         <Pressable
@@ -669,43 +682,57 @@ export default function Profile() {
             setShowAccountModal(true);
           }}
           style={{
-            backgroundColor: "#1a1a1a",
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-            borderRadius: 8,
+            backgroundColor: theme.colors.surface,
+            paddingHorizontal: theme.spacing.sm,
+            paddingVertical: theme.spacing.xs,
+            borderRadius: theme.borderRadius.md,
             borderWidth: 1,
-            borderColor: "#333",
+            borderColor: theme.colors.border,
             alignItems: "center",
             justifyContent: "center"
           }}
         >
           {/* Icône hamburger (3 barres) */}
           <View style={{ flexDirection: "column", gap: 2 }}>
-            <View style={{ width: 16, height: 2, backgroundColor: "#fff", borderRadius: 1 }} />
-            <View style={{ width: 16, height: 2, backgroundColor: "#fff", borderRadius: 1 }} />
-            <View style={{ width: 16, height: 2, backgroundColor: "#fff", borderRadius: 1 }} />
+            <View style={{ width: 16, height: 2, backgroundColor: theme.colors.text, borderRadius: 1 }} />
+            <View style={{ width: 16, height: 2, backgroundColor: theme.colors.text, borderRadius: 1 }} />
+            <View style={{ width: 16, height: 2, backgroundColor: theme.colors.text, borderRadius: 1 }} />
           </View>
         </Pressable>
       </View>
-      <Text style={{ color: "#aaa", marginBottom: 24 }}>
+      <Text style={{ 
+        color: theme.colors.textSecondary, 
+        ...theme.typography.body,
+        marginBottom: theme.spacing.lg 
+      }}>
         Gère tes informations et préférences
       </Text>
 
       {/* Section Plans sauvegardés */}
       <View style={{ 
-        backgroundColor: "#111", 
-        borderRadius: 16, 
-        padding: 20, 
-        marginBottom: 20
+        ...theme.card,
+        marginBottom: theme.spacing.lg
       }}>
-        <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700", marginBottom: 16 }}>
+        <Text style={{ 
+          color: theme.colors.text, 
+          ...theme.typography.h4, 
+          marginBottom: theme.spacing.md 
+        }}>
           Mes plans enregistrés
         </Text>
         
         {/* Séances sauvegardées */}
-        <View style={{ marginBottom: 16 }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <Text style={{ color: "#60A5FA", fontSize: 16, fontWeight: "600" }}>
+        <View style={{ marginBottom: theme.spacing.md }}>
+          <View style={{ 
+            flexDirection: "row", 
+            justifyContent: "space-between", 
+            alignItems: "center", 
+            marginBottom: theme.spacing.xs 
+          }}>
+            <Text style={{ 
+              color: theme.colors.primary, 
+              ...theme.typography.h4 
+            }}>
               Séances ({profile?.saved_plans?.workouts?.length || 0})
             </Text>
             {(profile?.saved_plans?.workouts?.length || 0) > 0 && (
@@ -713,14 +740,17 @@ export default function Profile() {
                 onPress={deleteAllWorkouts}
                 style={{
                   backgroundColor: "#2a1a1a",
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 6,
+                  paddingHorizontal: theme.spacing.sm,
+                  paddingVertical: theme.spacing.xs,
+                  borderRadius: theme.borderRadius.sm,
                   borderWidth: 1,
                   borderColor: "#4a2a2a"
                 }}
               >
-                <Text style={{ color: "#ff6666", fontSize: 12, fontWeight: "600" }}>
+                <Text style={{ 
+                  color: "#ff6666", 
+                  ...theme.typography.caption 
+                }}>
                   Tout supprimer
                 </Text>
               </Pressable>
@@ -740,18 +770,25 @@ export default function Profile() {
                   key={workout.id}
                   onPress={() => openPlanDetail('workout', workout)}
                   style={{ 
-                    backgroundColor: "#1a1f2e", 
-                    padding: 12, 
-                    borderRadius: 8, 
-                    marginBottom: 8,
+                    backgroundColor: theme.colors.surfaceElevated, 
+                    padding: theme.spacing.sm, 
+                    borderRadius: theme.borderRadius.md, 
+                    marginBottom: theme.spacing.sm,
                     borderLeftWidth: 3,
-                    borderLeftColor: "#60A5FA"
+                    borderLeftColor: theme.colors.primary
                   }}
                 >
-                  <Text style={{ color: "#fff", fontWeight: "600", fontSize: 14 }}>
+                  <Text style={{ 
+                    color: theme.colors.text, 
+                    ...theme.typography.body 
+                  }}>
                     {workout.title}
                   </Text>
-                  <Text style={{ color: "#aaa", fontSize: 12, marginTop: 4 }}>
+                  <Text style={{ 
+                    color: theme.colors.textSecondary, 
+                    ...theme.typography.caption, 
+                    marginTop: theme.spacing.xs 
+                  }}>
                     Sauvegardé le {new Date(workout.date).toLocaleDateString('fr-FR', {
                       day: 'numeric',
                       month: 'short',
@@ -759,11 +796,24 @@ export default function Profile() {
                       minute: '2-digit'
                     })}
                   </Text>
-                  <Text style={{ color: "#888", fontSize: 11, marginTop: 2, fontStyle: "italic" }}>
+                  <Text style={{ 
+                    color: theme.colors.textTertiary, 
+                    ...theme.typography.caption, 
+                    marginTop: theme.spacing.xs, 
+                    fontStyle: "italic" 
+                  }}>
                     {cleanedContent.substring(0, 100)}...
                   </Text>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
-                    <Text style={{ color: "#60A5FA", fontSize: 10, fontWeight: "600" }}>
+                  <View style={{ 
+                    flexDirection: "row", 
+                    justifyContent: "space-between", 
+                    alignItems: "center", 
+                    marginTop: theme.spacing.xs 
+                  }}>
+                    <Text style={{ 
+                      color: theme.colors.primary, 
+                      ...theme.typography.caption 
+                    }}>
                       Appuyer pour voir le détail
                     </Text>
                     <Pressable
@@ -804,15 +854,18 @@ export default function Profile() {
                         );
                       }}
                       style={{
-                        backgroundColor: "#1a2a4a",
-                        paddingHorizontal: 6,
-                        paddingVertical: 4,
-                        borderRadius: 4,
+                        backgroundColor: theme.colors.surface,
+                        paddingHorizontal: theme.spacing.xs,
+                        paddingVertical: theme.spacing.xs,
+                        borderRadius: theme.borderRadius.sm,
                         borderWidth: 1,
-                        borderColor: "#60A5FA"
+                        borderColor: theme.colors.primary
                       }}
                     >
-                      <Text style={{ color: "#60A5FA", fontSize: 10, fontWeight: "600" }}>🗑</Text>
+                      <Text style={{ 
+                        color: theme.colors.primary, 
+                        ...theme.typography.caption 
+                      }}>🗑</Text>
                     </Pressable>
                   </View>
                 </Pressable>
@@ -838,8 +891,16 @@ export default function Profile() {
         
         {/* Repas sauvegardés */}
         <View>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <Text style={{ color: "#3B82F6", fontSize: 16, fontWeight: "600" }}>
+          <View style={{ 
+            flexDirection: "row", 
+            justifyContent: "space-between", 
+            alignItems: "center", 
+            marginBottom: theme.spacing.xs 
+          }}>
+            <Text style={{ 
+              color: theme.colors.primary, 
+              ...theme.typography.h4 
+            }}>
               Repas ({profile?.saved_plans?.meals?.length || 0})
             </Text>
             {(profile?.saved_plans?.meals?.length || 0) > 0 && (
@@ -847,14 +908,17 @@ export default function Profile() {
                 onPress={deleteAllMeals}
                 style={{
                   backgroundColor: "#2a1a1a",
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 6,
+                  paddingHorizontal: theme.spacing.sm,
+                  paddingVertical: theme.spacing.xs,
+                  borderRadius: theme.borderRadius.sm,
                   borderWidth: 1,
                   borderColor: "#4a2a2a"
                 }}
               >
-                <Text style={{ color: "#ff6666", fontSize: 12, fontWeight: "600" }}>
+                <Text style={{ 
+                  color: "#ff6666", 
+                  ...theme.typography.caption 
+                }}>
                   Tout supprimer
                 </Text>
               </Pressable>
@@ -880,18 +944,25 @@ export default function Profile() {
                     content: cleanedContent
                   })}
                   style={{ 
-                    backgroundColor: "#1a1f3a", 
-                    padding: 12, 
-                    borderRadius: 8, 
-                    marginBottom: 8,
+                    backgroundColor: theme.colors.surfaceElevated, 
+                    padding: theme.spacing.sm, 
+                    borderRadius: theme.borderRadius.md, 
+                    marginBottom: theme.spacing.sm,
                     borderLeftWidth: 3,
-                    borderLeftColor: "#3B82F6"
+                    borderLeftColor: theme.colors.primary
                   }}
                 >
-                  <Text style={{ color: "#fff", fontWeight: "600", fontSize: 14 }}>
+                  <Text style={{ 
+                    color: theme.colors.text, 
+                    ...theme.typography.body 
+                  }}>
                     {meal.title}
                   </Text>
-                  <Text style={{ color: "#aaa", fontSize: 12, marginTop: 4 }}>
+                  <Text style={{ 
+                    color: theme.colors.textSecondary, 
+                    ...theme.typography.caption, 
+                    marginTop: theme.spacing.xs 
+                  }}>
                     Sauvegardé le {new Date(meal.date).toLocaleDateString('fr-FR', {
                       day: 'numeric',
                       month: 'short',
@@ -899,11 +970,24 @@ export default function Profile() {
                       minute: '2-digit'
                     })}
                   </Text>
-                  <Text style={{ color: "#888", fontSize: 11, marginTop: 2, fontStyle: "italic" }}>
+                  <Text style={{ 
+                    color: theme.colors.textTertiary, 
+                    ...theme.typography.caption, 
+                    marginTop: theme.spacing.xs, 
+                    fontStyle: "italic" 
+                  }}>
                     {cleanedContent.substring(0, 100)}...
                   </Text>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
-                    <Text style={{ color: "#3B82F6", fontSize: 10, fontWeight: "600" }}>
+                  <View style={{ 
+                    flexDirection: "row", 
+                    justifyContent: "space-between", 
+                    alignItems: "center", 
+                    marginTop: theme.spacing.xs 
+                  }}>
+                    <Text style={{ 
+                      color: theme.colors.primary, 
+                      ...theme.typography.caption 
+                    }}>
                       Appuyer pour voir le détail
                     </Text>
                     <Pressable
@@ -944,15 +1028,18 @@ export default function Profile() {
                         );
                       }}
                       style={{
-                        backgroundColor: "#1a1f3a",
-                        paddingHorizontal: 6,
-                        paddingVertical: 4,
-                        borderRadius: 4,
+                        backgroundColor: theme.colors.surface,
+                        paddingHorizontal: theme.spacing.xs,
+                        paddingVertical: theme.spacing.xs,
+                        borderRadius: theme.borderRadius.sm,
                         borderWidth: 1,
-                        borderColor: "#3B82F6"
+                        borderColor: theme.colors.primary
                       }}
                     >
-                      <Text style={{ color: "#3B82F6", fontSize: 10, fontWeight: "600" }}>🗑</Text>
+                      <Text style={{ 
+                        color: theme.colors.primary, 
+                        ...theme.typography.caption 
+                      }}>🗑</Text>
                     </Pressable>
                   </View>
                 </Pressable>
@@ -979,21 +1066,27 @@ export default function Profile() {
 
       {/* Section Informations personnelles */}
       <View style={{ 
-        backgroundColor: "#111", 
-        borderRadius: 16, 
-        padding: 20, 
-        marginBottom: 20
+        ...theme.card,
+        marginBottom: theme.spacing.lg
       }}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700" }}>
+        <View style={{ 
+          flexDirection: "row", 
+          justifyContent: "space-between", 
+          alignItems: "center", 
+          marginBottom: theme.spacing.md 
+        }}>
+          <Text style={{ 
+            color: theme.colors.text, 
+            ...theme.typography.h4 
+          }}>
             Informations personnelles
           </Text>
           <Pressable
             onPress={() => isEditing ? handleSaveProfile() : setIsEditing(true)}
             style={{
               backgroundColor: "transparent",
-              paddingHorizontal: 8,
-              paddingVertical: 8,
+              paddingHorizontal: theme.spacing.sm,
+              paddingVertical: theme.spacing.sm,
               alignItems: "center",
               justifyContent: "center",
               minWidth: 32,
@@ -1001,7 +1094,10 @@ export default function Profile() {
             }}
           >
             {isEditing ? (
-              <Text style={{ color: "#00D4AA", fontWeight: "600", fontSize: 16 }}>
+              <Text style={{ 
+                color: "#00D4AA", 
+                ...theme.typography.body 
+              }}>
                 ✓
               </Text>
             ) : (
@@ -1089,7 +1185,11 @@ export default function Profile() {
           </View>
 
           <View>
-            <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>
+            <Text style={{ 
+              color: theme.colors.textSecondary, 
+              ...theme.typography.caption, 
+              marginBottom: theme.spacing.xs 
+            }}>
               Prénom
             </Text>
             {isEditing ? (
@@ -1097,26 +1197,28 @@ export default function Profile() {
                 value={firstName}
                 onChangeText={setFirstName}
                 placeholder="Ton prénom"
-                placeholderTextColor="#666"
+                placeholderTextColor={theme.colors.textTertiary}
                 style={{
-                  backgroundColor: "#222",
-                  borderWidth: 1,
-                  borderColor: "#333",
-                  padding: 12,
-                  borderRadius: 8,
-                  color: "#fff",
-                  fontSize: 16,
+                  ...theme.input,
                 }}
               />
             ) : (
-              <Text style={{ color: "#fff", fontSize: 16, paddingVertical: 4 }}>
+              <Text style={{ 
+                color: theme.colors.text, 
+                ...theme.typography.body, 
+                paddingVertical: theme.spacing.xs 
+              }}>
                 {profile?.first_name || "Non renseigné"}
               </Text>
             )}
           </View>
 
           <View>
-            <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>
+            <Text style={{ 
+              color: theme.colors.textSecondary, 
+              ...theme.typography.caption, 
+              marginBottom: theme.spacing.xs 
+            }}>
               Âge
             </Text>
             {isEditing ? (
@@ -1124,27 +1226,29 @@ export default function Profile() {
                 value={age}
                 onChangeText={setAge}
                 placeholder="Ton âge"
-                placeholderTextColor="#666"
+                placeholderTextColor={theme.colors.textTertiary}
                 keyboardType="numeric"
                 style={{
-                  backgroundColor: "#222",
-                  borderWidth: 1,
-                  borderColor: "#333",
-                  padding: 12,
-                  borderRadius: 8,
-                  color: "#fff",
-                  fontSize: 16,
+                  ...theme.input,
                 }}
               />
             ) : (
-              <Text style={{ color: "#fff", fontSize: 16, paddingVertical: 4 }}>
+              <Text style={{ 
+                color: theme.colors.text, 
+                ...theme.typography.body, 
+                paddingVertical: theme.spacing.xs 
+              }}>
                 {profile?.age ? `${profile.age} ans` : "Non renseigné"}
               </Text>
             )}
           </View>
 
           <View>
-            <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>
+            <Text style={{ 
+              color: theme.colors.textSecondary, 
+              ...theme.typography.caption, 
+              marginBottom: theme.spacing.xs 
+            }}>
               Poids
             </Text>
             {isEditing ? (
@@ -1152,27 +1256,29 @@ export default function Profile() {
                 value={weight}
                 onChangeText={setWeight}
                 placeholder="Ton poids en kg"
-                placeholderTextColor="#666"
+                placeholderTextColor={theme.colors.textTertiary}
                 keyboardType="numeric"
                 style={{
-                  backgroundColor: "#222",
-                  borderWidth: 1,
-                  borderColor: "#333",
-                  padding: 12,
-                  borderRadius: 8,
-                  color: "#fff",
-                  fontSize: 16,
+                  ...theme.input,
                 }}
               />
             ) : (
-              <Text style={{ color: "#fff", fontSize: 16, paddingVertical: 4 }}>
+              <Text style={{ 
+                color: theme.colors.text, 
+                ...theme.typography.body, 
+                paddingVertical: theme.spacing.xs 
+              }}>
                 {profile?.weight ? `${profile.weight} kg` : "Non renseigné"}
               </Text>
             )}
           </View>
 
           <View>
-            <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>
+            <Text style={{ 
+              color: theme.colors.textSecondary, 
+              ...theme.typography.caption, 
+              marginBottom: theme.spacing.xs 
+            }}>
               Taille
             </Text>
             {isEditing ? (
@@ -1180,20 +1286,18 @@ export default function Profile() {
                 value={height}
                 onChangeText={setHeight}
                 placeholder="Ta taille en cm"
-                placeholderTextColor="#666"
+                placeholderTextColor={theme.colors.textTertiary}
                 keyboardType="numeric"
                 style={{
-                  backgroundColor: "#222",
-                  borderWidth: 1,
-                  borderColor: "#333",
-                  padding: 12,
-                  borderRadius: 8,
-                  color: "#fff",
-                  fontSize: 16,
+                  ...theme.input,
                 }}
               />
             ) : (
-              <Text style={{ color: "#fff", fontSize: 16, paddingVertical: 4 }}>
+              <Text style={{ 
+                color: theme.colors.text, 
+                ...theme.typography.body, 
+                paddingVertical: theme.spacing.xs 
+              }}>
                 {profile?.height ? `${profile.height} cm` : "Non renseigné"}
               </Text>
             )}
@@ -1203,13 +1307,19 @@ export default function Profile() {
 
       {/* Section Préférences */}
       <View style={{ 
-        backgroundColor: "#111", 
-        borderRadius: 16, 
-        padding: 20, 
-        marginBottom: 20
+        ...theme.card,
+        marginBottom: theme.spacing.lg
       }}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700" }}>
+        <View style={{ 
+          flexDirection: "row", 
+          justifyContent: "space-between", 
+          alignItems: "center", 
+          marginBottom: theme.spacing.md 
+        }}>
+          <Text style={{ 
+            color: theme.colors.text, 
+            ...theme.typography.h4 
+          }}>
             Préférences
           </Text>
           <View style={{ flexDirection: "row", gap: 8 }}>
