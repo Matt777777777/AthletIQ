@@ -2016,7 +2016,7 @@ export default function Dashboard() {
             >
               <Text style={{ 
                 color: theme.colors.primary, 
-                ...theme.typography.buttonSmall
+                ...theme.typography.button
               }}>
                 Importer une séance
               </Text>
@@ -2139,9 +2139,56 @@ export default function Dashboard() {
       </View>
 
             <ScrollView style={{ maxHeight: 400 }}>
-              <Text style={{ color: "#ccc", fontSize: 14, lineHeight: 20 }}>
-                {selectedMeal?.content}
-              </Text>
+              {selectedMeal?.content ? (
+                <View>
+                  {selectedMeal.content.split('\n').map((line, index) => {
+                    // Détecter les sections Ingrédients et Préparation
+                    if (line.toLowerCase().includes('ingrédients') && line.includes(':')) {
+                      return (
+                        <View key={index} style={{ marginTop: index > 0 ? 20 : 0, marginBottom: 10 }}>
+                          <Text style={{ 
+                            color: theme.colors.primary, 
+                            fontSize: 16, 
+                            fontWeight: '700',
+                            marginBottom: 8
+                          }}>
+                            {line}
+                          </Text>
+                        </View>
+                      );
+                    }
+                    if (line.toLowerCase().includes('préparation') && line.includes(':')) {
+                      return (
+                        <View key={index} style={{ marginTop: 20, marginBottom: 10 }}>
+                          <Text style={{ 
+                            color: theme.colors.primary, 
+                            fontSize: 16, 
+                            fontWeight: '700',
+                            marginBottom: 8
+                          }}>
+                            {line}
+                          </Text>
+                        </View>
+                      );
+                    }
+                    // Lignes normales
+                    return (
+                      <Text key={index} style={{ 
+                        color: "#ccc", 
+                        fontSize: 14, 
+                        lineHeight: 20,
+                        marginBottom: 4
+                      }}>
+                        {line}
+                      </Text>
+                    );
+                  })}
+                </View>
+              ) : (
+                <Text style={{ color: "#ccc", fontSize: 14, lineHeight: 20 }}>
+                  Aucun contenu disponible
+                </Text>
+              )}
             </ScrollView>
           </View>
         </View>
@@ -2497,7 +2544,14 @@ export default function Dashboard() {
             }}
           >
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700" }}>
+              <Text style={{ 
+                color: "#fff", 
+                fontSize: 18, 
+                fontWeight: "700", 
+                flex: 1, 
+                marginRight: 12,
+                flexWrap: 'wrap'
+              }}>
                 {selectedWorkout?.title}
               </Text>
           <Pressable
@@ -2507,12 +2561,16 @@ export default function Dashboard() {
                 }}
             style={{
                   backgroundColor: "#333",
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 8,
+                  paddingHorizontal: 8,
+                  paddingVertical: 8,
+                  borderRadius: 6,
+                  minWidth: 32,
+                  minHeight: 32,
+                  justifyContent: "center",
+                  alignItems: "center"
                 }}
               >
-                <Text style={{ color: "#fff", fontWeight: "600" }}>Fermer</Text>
+                <Text style={{ color: "#fff", fontWeight: "600", fontSize: 16 }}>✕</Text>
               </Pressable>
             </View>
 

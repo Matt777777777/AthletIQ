@@ -2,11 +2,11 @@ import { useFocusEffect } from "@react-navigation/native";
 import React, { useEffect, useRef, useState } from "react";
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from "react-native";
 import { checkAndResetDailyChat, loadChatMessages, Message, saveChatMessages } from "../lib/chat";
-import { estimateMealNutrition } from "../lib/meal-nutrition";
 import { estimateKcalTarget } from "../lib/nutrition";
-import { loadProfile, saveDailyMeal, savePlan, saveProfile, UserProfile } from "../lib/profile";
+import { loadProfile, savePlan, saveProfile, UserProfile } from "../lib/profile";
 import { addShoppingItem, extractIngredientsFromAIResponse } from "../lib/shopping";
 import { calculateWorkoutCalories } from "../lib/workout-calories";
+import { theme } from "../theme";
 
 // ✅ Endpoint Vercel (prod)
 const endpoint =
@@ -211,66 +211,7 @@ export default function Chat() {
     }, 100);
   };
 
-  // Fonction pour détecter si la réponse contient plusieurs repas du jour
-  const detectMultipleMeals = (content: string): boolean => {
-    const contentLower = content.toLowerCase();
-    const mealKeywords = ['petit-déjeuner', 'déjeuner', 'collation', 'dîner', 'breakfast', 'lunch', 'snack', 'dinner'];
-    const foundMeals = mealKeywords.filter(keyword => contentLower.includes(keyword));
-    return foundMeals.length >= 3; // Si on trouve au moins 3 types de repas
-  };
 
-  // Fonction pour extraire les repas individuels d'une réponse multi-repas
-  const extractIndividualMeals = (content: string): Array<{type: string, title: string, content: string}> => {
-    const meals: Array<{type: string, title: string, content: string}> = [];
-    
-    // Diviser le contenu par sections de repas
-    const sections = content.split(/(?=PETIT-DÉJEUNER|DÉJEUNER|COLLATION|DÎNER|BREAKFAST|LUNCH|SNACK|DINNER)/i);
-    
-    sections.forEach(section => {
-      const trimmedSection = section.trim();
-      if (!trimmedSection) return;
-      
-      // Déterminer le type de repas
-      let mealType = '';
-      if (trimmedSection.toLowerCase().includes('petit-déjeuner') || trimmedSection.toLowerCase().includes('breakfast')) {
-        mealType = 'breakfast';
-      } else if (trimmedSection.toLowerCase().includes('déjeuner') || trimmedSection.toLowerCase().includes('lunch')) {
-        mealType = 'lunch';
-      } else if (trimmedSection.toLowerCase().includes('collation') || trimmedSection.toLowerCase().includes('snack')) {
-        mealType = 'snack';
-      } else if (trimmedSection.toLowerCase().includes('dîner') || trimmedSection.toLowerCase().includes('dinner')) {
-        mealType = 'dinner';
-      }
-      
-      if (mealType) {
-        const lines = trimmedSection.split('\n').filter(line => line.trim().length > 0);
-        
-        // Chercher le nom du plat (première ligne qui n'est pas un titre de section)
-        let title = `${mealType} généré`;
-        let contentStartIndex = 1;
-        
-        // Ignorer les lignes de titre de section (PETIT-DÉJEUNER, etc.)
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (line && !line.match(/^(PETIT-DÉJEUNER|DÉJEUNER|COLLATION|DÎNER|BREAKFAST|LUNCH|SNACK|DINNER)/i)) {
-            title = line;
-            contentStartIndex = i + 1;
-            break;
-          }
-        }
-        
-        const mealContent = lines.slice(contentStartIndex).join('\n').trim();
-        
-        meals.push({
-          type: mealType,
-          title: title,
-          content: mealContent
-        });
-      }
-    });
-    
-    return meals;
-  };
 
   // Questions complémentaires pour le profil
   const profileQuestions = [
@@ -838,14 +779,24 @@ export default function Chat() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: "#000" }}
+      style={{ flex: 1, backgroundColor: theme.colors.background }}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
       enabled={true}
     >
       <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 60, paddingHorizontal: 12, marginBottom: 12 }}>
-          <Text style={{ color: "#fff", fontSize: 22, fontWeight: "800" }}>
+        <View style={{ 
+          flexDirection: "row", 
+          justifyContent: "space-between", 
+          alignItems: "center", 
+          paddingTop: 60, 
+          paddingHorizontal: theme.spacing.md, 
+          marginBottom: theme.spacing.md 
+        }}>
+          <Text style={{ 
+            color: theme.colors.text, 
+            ...theme.typography.h2 
+          }}>
             Ton coach IA
         </Text>
           {/* Boutons masqués */}
@@ -891,8 +842,8 @@ export default function Chat() {
           data={messages}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ 
-            paddingBottom: 12, 
-            paddingHorizontal: 12,
+            paddingBottom: theme.spacing.md, 
+            paddingHorizontal: theme.spacing.md,
             flexGrow: 1,
             minHeight: '100%'
           }}
@@ -910,17 +861,22 @@ export default function Chat() {
             <View
               style={{
                 alignSelf: item.sender === "user" ? "flex-end" : "flex-start",
-                backgroundColor: item.sender === "user" ? "#0070F3" : "#1b1b1b",
-                marginVertical: 6,
-                padding: 12,
-                borderRadius: 12,
+                backgroundColor: item.sender === "user" ? theme.colors.primary : theme.colors.surfaceElevated,
+                marginVertical: theme.spacing.xs,
+                padding: theme.spacing.md,
+                borderRadius: theme.borderRadius.lg,
                 maxWidth: "78%",
+                ...theme.shadows.sm
               }}
             >
-              <Text style={{ color: "#fff", lineHeight: 20 }}>
+              <Text style={{ 
+                color: theme.colors.text, 
+                ...theme.typography.body,
+                lineHeight: 20 
+              }}>
                   {cleanText(item.text)}
                   {item.sender === "ai" && isTyping && item.text === "" && (
-                    <Text style={{ color: "#666" }}>🤖 écrit...</Text>
+                    <Text style={{ color: theme.colors.textTertiary }}>🤖 écrit...</Text>
                   )}
               </Text>
               </View>
@@ -928,22 +884,20 @@ export default function Chat() {
               {/* Boutons de démarrage - affichés après le message d'accueil ou de completion */}
               {((item.id === "welcome" && profile && profile.chat_questions_asked && !isAskingProfileQuestions) || 
                 (item.id === "completion" && profile && profile.chat_questions_asked)) && (
-                <View style={{ padding: 16, alignItems: "center" }}>
-                  <View style={{ flexDirection: "row", gap: 12, width: "100%" }}>
+                <View style={{ padding: theme.spacing.lg, alignItems: "center" }}>
+                  <View style={{ flexDirection: "row", gap: theme.spacing.sm, width: "100%" }}>
                     <Pressable
                       onPress={generateStarterMeal}
                       style={{
                         flex: 1,
-                        backgroundColor: "#0070F3",
-                        paddingVertical: 10,
-                        paddingHorizontal: 16,
-                        borderRadius: 8,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        minHeight: 40,
+                        ...theme.button.secondary,
                       }}
                     >
-                      <Text style={{ color: "#fff", fontWeight: "600", fontSize: 14, textAlign: "center" }}>
+                      <Text style={{ 
+                        color: theme.colors.primary, 
+                        ...theme.typography.button,
+                        textAlign: "center" 
+                      }}>
                         Générer un repas
                       </Text>
                     </Pressable>
@@ -952,16 +906,14 @@ export default function Chat() {
                       onPress={generateStarterWorkout}
                       style={{
                         flex: 1,
-                        backgroundColor: "#0070F3",
-                        paddingVertical: 10,
-                        paddingHorizontal: 16,
-                        borderRadius: 8,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        minHeight: 40,
+                        ...theme.button.secondary,
                       }}
                     >
-                      <Text style={{ color: "#fff", fontWeight: "600", fontSize: 14, textAlign: "center" }}>
+                      <Text style={{ 
+                        color: theme.colors.primary, 
+                        ...theme.typography.button,
+                        textAlign: "center" 
+                      }}>
                         Séance de sport
                       </Text>
                     </Pressable>
@@ -992,131 +944,7 @@ export default function Chat() {
                 {/* Boutons d'action rapide - affichés seulement après une réponse IA */}
         {showSaveButtons && lastAIResponse && (
           <View style={{ paddingVertical: 8 }}>
-            {/* Détecter si c'est un repas unique ou multiple */}
-            {detectMultipleMeals(lastAIResponse.text) ? (
-              // Boutons pour repas multiples (repas du jour)
-              <View>
-                <Text style={{ color: "#8a8a8a", fontSize: 12, marginBottom: 8, textAlign: "center" }}>
-                  Enregistrer tous les repas du jour :
-                </Text>
-          <Pressable
-                  onPress={async () => {
-                    try {
-                      const meals = extractIndividualMeals(lastAIResponse?.text || '');
-                      let savedCount = 0;
-                      
-                      for (const meal of meals) {
-                        // Calculer les calories du repas généré
-                        const nutrition = estimateMealNutrition(meal.content, meal.type as 'breakfast' | 'lunch' | 'snack' | 'dinner');
-                        const mealWithNutrition = {
-                          id: `${meal.type}_${Date.now()}_${Math.random()}`,
-                          title: meal.title,
-                          content: meal.content,
-                          date: new Date().toISOString(),
-                          nutrition: nutrition
-                        };
-
-                        const success = await saveDailyMeal(meal.type as 'breakfast' | 'lunch' | 'snack' | 'dinner', mealWithNutrition);
-                        if (success) savedCount++;
-                      }
-                      
-                      if (savedCount > 0) {
-                        const confirmMessage: Message = {
-                          id: `confirm_${Date.now()}`,
-                          text: `${savedCount} repas enregistrés dans tes repas du jour !`,
-                          sender: "ai",
-                        };
-                        setMessages(prev => [...prev, confirmMessage]);
-                      }
-                    } catch (error) {
-                      console.error('Erreur sauvegarde repas multiples:', error);
-                    }
-                  }}
-                  style={{
-                    backgroundColor: "#1a2a1a",
-                    paddingVertical: 12,
-                    paddingHorizontal: 16,
-                    borderRadius: 8,
-                    alignItems: "center",
-              borderWidth: 1,
-                    borderColor: "#2a4a2a",
-                    marginBottom: 8,
-                  }}
-                >
-                  <Text style={{ color: "#4CAF50", fontWeight: "600", fontSize: 14 }}>
-                    Enregistrer tous les repas du jour
-                  </Text>
-                </Pressable>
-                
-                <View style={{ flexDirection: "row", gap: 8 }}>
-          <Pressable
-                    onPress={async () => {
-                      const mealTitle = extractMealTitle(lastAIResponse?.text || '');
-                      const mealContent = cleanMealContent(lastAIResponse?.text || '');
-                      const success = await savePlan('meal', mealTitle, mealContent);
-                      if (success) {
-                        const updatedProfile = await loadProfile();
-                        setProfile(updatedProfile);
-                        const confirmMessage: Message = {
-                          id: `confirm_${Date.now()}`,
-                          text: "Repas enregistré dans tes plans !",
-                          sender: "ai",
-                        };
-                        setMessages(prev => [...prev, confirmMessage]);
-                      }
-                    }}
-                    style={{
-              flex: 1,
-                      backgroundColor: "#1a2a1a",
-              paddingVertical: 10,
-                      paddingHorizontal: 12,
-                      borderRadius: 8,
-              alignItems: "center",
-                      borderWidth: 1,
-                      borderColor: "#2a4a2a",
-                    }}
-                  >
-                    <Text style={{ color: "#6bff6b", fontWeight: "600", fontSize: 12 }}>
-                      Enregistrer repas
-            </Text>
-          </Pressable>
-
-          <Pressable
-                    onPress={async () => {
-                      const mealTitle = extractMealTitle(lastAIResponse?.text || '');
-                      const mealContent = cleanMealContent(lastAIResponse?.text || '');
-                      const success = await savePlan('meal', mealTitle, mealContent);
-                      if (success) {
-                        const updatedProfile = await loadProfile();
-                        setProfile(updatedProfile);
-                        const confirmMessage: Message = {
-                          id: `confirm_${Date.now()}`,
-                          text: "Repas enregistré dans tes plans !",
-                          sender: "ai",
-                        };
-                        setMessages(prev => [...prev, confirmMessage]);
-                      }
-                    }}
-                    style={{
-              flex: 1,
-                      backgroundColor: "#1a1a2a",
-              paddingVertical: 10,
-                      paddingHorizontal: 12,
-                      borderRadius: 8,
-              alignItems: "center",
-                      borderWidth: 1,
-                      borderColor: "#2a2a4a",
-                    }}
-                  >
-                    <Text style={{ color: "#6b6bff", fontWeight: "600", fontSize: 12 }}>
-                      Enregistrer repas
-            </Text>
-          </Pressable>
-        </View>
-              </View>
-            ) : (
-              // Boutons pour repas unique
-              <View style={{ flexDirection: "row", gap: 8 }}>
+            <View style={{ flexDirection: "row", gap: theme.spacing.sm }}>
           <Pressable
                   onPress={async () => {
                     const mealTitle = extractMealTitle(lastAIResponse?.text || '');
@@ -1135,16 +963,17 @@ export default function Chat() {
                   }}
                   style={{
                     flex: 1,
-                    backgroundColor: "#1a2a1a",
-                    paddingVertical: 10,
-                    paddingHorizontal: 12,
-                    borderRadius: 8,
+                    ...theme.button.secondary,
                     alignItems: "center",
-              borderWidth: 1,
-                    borderColor: "#2a4a2a",
+                    borderWidth: 1,
+                    borderColor: theme.colors.primary,
                   }}
                 >
-                  <Text style={{ color: "#6bff6b", fontWeight: "600", fontSize: 12 }}>
+                  <Text style={{ 
+                    color: theme.colors.primary, 
+                    ...theme.typography.caption,
+                    fontWeight: "600" 
+                  }}>
                     Enregistrer repas
                   </Text>
                 </Pressable>
@@ -1174,21 +1003,21 @@ export default function Chat() {
                   }}
                   style={{
                     flex: 1,
-                    backgroundColor: "#1a1a2a",
-                    paddingVertical: 10,
-                    paddingHorizontal: 12,
-                    borderRadius: 8,
-              alignItems: "center",
-              borderWidth: 1,
-                    borderColor: "#2a2a4a",
+                    ...theme.button.secondary,
+                    alignItems: "center",
+                    borderWidth: 1,
+                    borderColor: theme.colors.primary,
                   }}
                 >
-                  <Text style={{ color: "#6b6bff", fontWeight: "600", fontSize: 12 }}>
+                  <Text style={{ 
+                    color: theme.colors.primary, 
+                    ...theme.typography.caption,
+                    fontWeight: "600" 
+                  }}>
                     Enregistrer séance
             </Text>
           </Pressable>
         </View>
-            )}
           </View>
         )}
 
@@ -1259,42 +1088,41 @@ export default function Chat() {
                 }
               }}
               style={{
-                backgroundColor: "#2a1a1a",
-                paddingVertical: 10,
-                paddingHorizontal: 12,
-                borderRadius: 8,
-              alignItems: "center",
+                ...theme.button.secondary,
+                alignItems: "center",
                 borderWidth: 1,
-                borderColor: "#4a2a2a",
+                borderColor: theme.colors.primary,
               }}
             >
-              <Text style={{ color: "#ff9f6b", fontWeight: "600", fontSize: 12 }}>
+              <Text style={{ 
+                color: theme.colors.primary, 
+                ...theme.typography.caption,
+                fontWeight: "600" 
+              }}>
                 Ajouter à ma liste de courses
             </Text>
           </Pressable>
         </View>
         )}
 
-        <View style={{ 
+        <View style={{
           flexDirection: "row", 
           alignItems: "center", 
-          paddingVertical: 8,
-          paddingBottom: Platform.OS === "ios" ? 8 : 12,
-          backgroundColor: "#000"
+          paddingVertical: theme.spacing.sm,
+          paddingBottom: Platform.OS === "ios" ? theme.spacing.sm : theme.spacing.md,
+          backgroundColor: theme.colors.background,
+          paddingHorizontal: theme.spacing.md
         }}>
           <TextInput
             value={input}
             onChangeText={setInput}
             placeholder={loading || isTyping ? "🤖 Génération en cours..." : "Écris ton message..."}
             editable={!loading && !isTyping}
-            placeholderTextColor="#777"
+            placeholderTextColor={theme.colors.textTertiary}
             style={{
               flex: 1,
-              backgroundColor: "#111",
-              color: "#fff",
-              padding: 12,
-              borderRadius: 12,
-              marginRight: 8,
+              ...theme.input,
+              marginRight: theme.spacing.sm,
             }}
             onSubmitEditing={sendMessage}
             returnKeyType="send"
@@ -1305,13 +1133,14 @@ export default function Chat() {
             onPress={sendMessage}
             disabled={loading || isTyping}
             style={{
-              backgroundColor: loading || isTyping ? "#333" : "#0070F3",
-              paddingVertical: 12,
-              paddingHorizontal: 18,
-              borderRadius: 12,
+              ...theme.button.primary,
+              opacity: loading || isTyping ? 0.6 : 1,
             }}
           >
-            <Text style={{ color: "#fff", fontWeight: "700" }}>
+            <Text style={{ 
+              color: theme.colors.text, 
+              ...theme.typography.button 
+            }}>
               {loading || isTyping ? "…" : "Envoyer"}
             </Text>
           </Pressable>

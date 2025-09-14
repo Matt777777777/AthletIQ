@@ -22,6 +22,7 @@ import {
     ShoppingItem,
     toggleItem
 } from "../lib/shopping";
+import { theme } from "../theme";
 
 export default function Shopping() {
   const [itemsByCategory, setItemsByCategory] = useState<Record<string, ShoppingItem[]>>({});
@@ -49,7 +50,7 @@ export default function Shopping() {
   const handleToggle = async (id: string) => {
     setLoading(true); // Désactiver les interactions pendant le toggle
     try {
-      await toggleItem(id);
+    await toggleItem(id);
       await refresh();
     } catch (error) {
       console.error('Error toggling item:', error);
@@ -272,28 +273,75 @@ export default function Shopping() {
 
 
     return (
-    <View style={{ flex: 1, backgroundColor: "#000" }}>
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       {/* Header fixe */}
-      <View style={{ paddingTop: 60, paddingHorizontal: 16, paddingBottom: 16, backgroundColor: "#000" }}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <Text style={{ color: "#fff", fontSize: 24, fontWeight: "800" }}>
+      <View style={{ 
+        paddingTop: 60, 
+        paddingHorizontal: theme.spacing.md, 
+        paddingBottom: theme.spacing.md, 
+        backgroundColor: theme.colors.background 
+      }}>
+        <View style={{ 
+          flexDirection: "row", 
+          justifyContent: "space-between", 
+          alignItems: "center", 
+          marginBottom: theme.spacing.xs 
+        }}>
+          <Text style={{ 
+            color: theme.colors.text, 
+            ...theme.typography.h2 
+          }}>
             Liste de courses
-          </Text>
+        </Text>
         </View>
         
         {/* Stats */}
-        <View style={{ flexDirection: "row", gap: 12, marginBottom: 20 }}>
-          <View style={{ backgroundColor: "#111", padding: 12, borderRadius: 12, flex: 1 }}>
-            <Text style={{ color: "#fff", fontWeight: "800", fontSize: 18 }}>{totalItems}</Text>
-            <Text style={{ color: "#aaa", fontSize: 12 }}>Total</Text>
+        <View style={{ 
+          flexDirection: "row", 
+          gap: theme.spacing.sm, 
+          marginBottom: theme.spacing.lg 
+        }}>
+          <View style={{ 
+            ...theme.card, 
+            padding: theme.spacing.md, 
+            flex: 1 
+          }}>
+            <Text style={{ 
+              color: theme.colors.text, 
+              ...theme.typography.h3 
+            }}>{totalItems}</Text>
+            <Text style={{ 
+              color: theme.colors.textSecondary, 
+              ...theme.typography.caption 
+            }}>Total</Text>
           </View>
-          <View style={{ backgroundColor: "#0e1622", padding: 12, borderRadius: 12, flex: 1 }}>
-            <Text style={{ color: "#9fc0ff", fontWeight: "800", fontSize: 18 }}>{uncheckedItems}</Text>
-            <Text style={{ color: "#aaa", fontSize: 12 }}>À acheter</Text>
+          <View style={{ 
+            ...theme.card, 
+            padding: theme.spacing.md, 
+            flex: 1 
+          }}>
+            <Text style={{ 
+              color: theme.colors.primary, 
+              ...theme.typography.h3 
+            }}>{uncheckedItems}</Text>
+            <Text style={{ 
+              color: theme.colors.textSecondary, 
+              ...theme.typography.caption 
+            }}>À acheter</Text>
           </View>
-          <View style={{ backgroundColor: "#1a3a1a", padding: 12, borderRadius: 12, flex: 1 }}>
-            <Text style={{ color: "#4CAF50", fontWeight: "800", fontSize: 18 }}>{checkedItems}</Text>
-            <Text style={{ color: "#aaa", fontSize: 12 }}>Acheté</Text>
+          <View style={{ 
+            ...theme.card, 
+            padding: theme.spacing.md, 
+            flex: 1 
+          }}>
+            <Text style={{ 
+              color: "#4CAF50", 
+              ...theme.typography.h3 
+            }}>{checkedItems}</Text>
+            <Text style={{ 
+              color: theme.colors.textSecondary, 
+              ...theme.typography.caption 
+            }}>Acheté</Text>
           </View>
         </View>
 
@@ -301,15 +349,16 @@ export default function Shopping() {
         <Pressable
           onPress={() => setShowAddForm(!showAddForm)}
           style={({ pressed }) => ({
-            backgroundColor: pressed ? "#0057c0" : "#0070F3",
-            paddingVertical: 14,
-            borderRadius: 12,
-            alignItems: "center",
-            marginBottom: 20,
+            ...theme.button.primary,
+            opacity: pressed ? 0.8 : 1,
+            marginBottom: theme.spacing.lg,
           })}
         >
-          <Text style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>
-            {showAddForm ? "✕ Fermer" : "➕ Ajouter un ingrédient"}
+          <Text style={{ 
+            color: theme.colors.text, 
+            ...theme.typography.button 
+          }}>
+            {showAddForm ? "Fermer" : "Ajouter un ingrédient"}
           </Text>
         </Pressable>
       </View>
@@ -317,96 +366,124 @@ export default function Shopping() {
       {/* Contenu scrollable */}
       <ScrollView 
         style={{ flex: 1 }} 
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
+        contentContainerStyle={{ 
+          paddingHorizontal: theme.spacing.md, 
+          paddingBottom: theme.spacing.xl 
+        }}
         showsVerticalScrollIndicator={false}
       >
         {/* Formulaire d'ajout */}
         {showAddForm && (
-          <View style={{ backgroundColor: "#111", padding: 16, borderRadius: 12, marginBottom: 20, borderWidth: 1, borderColor: "#2a2a2a" }}>
-            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16, marginBottom: 16 }}>
+          <View style={{ 
+            ...theme.card, 
+            padding: theme.spacing.md, 
+            marginBottom: theme.spacing.lg 
+          }}>
+            <Text style={{ 
+              color: theme.colors.text, 
+              ...theme.typography.h4, 
+              marginBottom: theme.spacing.md 
+            }}>
               Nouvel ingrédient
             </Text>
             
             {/* Nom */}
-            <Text style={{ color: "#aaa", marginBottom: 6 }}>Nom de l'ingrédient *</Text>
+            <Text style={{ 
+              color: theme.colors.textSecondary, 
+              ...theme.typography.caption, 
+              marginBottom: theme.spacing.xs 
+            }}>Nom de l'ingrédient *</Text>
             <TextInput
               value={newItemName}
               onChangeText={setNewItemName}
               placeholder="Ex: Pommes, Poulet, Riz..."
-              placeholderTextColor="#666"
+              placeholderTextColor={theme.colors.textTertiary}
               style={{
-                backgroundColor: "#1a1a1a",
-                color: "#fff",
-                padding: 12,
-                borderRadius: 8,
-                marginBottom: 12,
-                borderWidth: 1,
-                borderColor: "#333",
+                ...theme.input,
+                marginBottom: theme.spacing.sm,
               }}
             />
             
             {/* Quantité et unité */}
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+            <View style={{ 
+              flexDirection: "row", 
+              gap: theme.spacing.sm, 
+              marginBottom: theme.spacing.sm 
+            }}>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: "#aaa", marginBottom: 6 }}>Quantité</Text>
+                <Text style={{ 
+                  color: theme.colors.textSecondary, 
+                  ...theme.typography.caption, 
+                  marginBottom: theme.spacing.xs 
+                }}>Quantité</Text>
                 <TextInput
                   value={newItemQuantity}
                   onChangeText={setNewItemQuantity}
                   placeholder="Ex: 500, 2, 1..."
-                  placeholderTextColor="#666"
+                  placeholderTextColor={theme.colors.textTertiary}
                   style={{
-                    backgroundColor: "#1a1a1a",
-                    color: "#fff",
-                    padding: 12,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: "#333",
+                    ...theme.input,
                   }}
                 />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: "#aaa", marginBottom: 6 }}>Unité</Text>
+                <Text style={{ 
+                  color: theme.colors.textSecondary, 
+                  ...theme.typography.caption, 
+                  marginBottom: theme.spacing.xs 
+                }}>Unité</Text>
                 <TextInput
                   value={newItemUnit}
                   onChangeText={setNewItemUnit}
                   placeholder="Ex: g, kg, ml, unités..."
-                  placeholderTextColor="#666"
+                  placeholderTextColor={theme.colors.textTertiary}
                   style={{
-                    backgroundColor: "#1a1a1a",
-                    color: "#fff",
-                    padding: 12,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: "#333",
+                    ...theme.input,
                   }}
                 />
               </View>
             </View>
             
             {/* Catégorie */}
-            <Text style={{ color: "#aaa", marginBottom: 6 }}>Catégorie</Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+            <Text style={{ 
+              color: theme.colors.textSecondary, 
+              ...theme.typography.caption, 
+              marginBottom: theme.spacing.xs 
+            }}>Catégorie</Text>
+            <View style={{ 
+              flexDirection: "row", 
+              flexWrap: "wrap", 
+              gap: theme.spacing.sm, 
+              marginBottom: theme.spacing.md 
+            }}>
               {categories.map((cat) => (
                 <Pressable
                   key={cat}
                   onPress={() => setNewItemCategory(cat)}
                   style={{
-                    backgroundColor: newItemCategory === cat ? "#0070F3" : "#1a1a1a",
-                    paddingHorizontal: 12,
-                    paddingVertical: 8,
-                    borderRadius: 8,
+                    backgroundColor: newItemCategory === cat ? theme.colors.primary : theme.colors.surface,
+                    paddingHorizontal: theme.spacing.sm,
+                    paddingVertical: theme.spacing.xs,
+                    borderRadius: theme.borderRadius.md,
                     borderWidth: 1,
-                    borderColor: newItemCategory === cat ? "#0070F3" : "#333",
+                    borderColor: newItemCategory === cat ? theme.colors.primary : theme.colors.border,
                   }}
                 >
-                  <Text style={{ color: "#fff", fontSize: 12 }}>{cat}</Text>
+                  <Text style={{ 
+                    color: theme.colors.text, 
+                    ...theme.typography.caption 
+                  }}>{cat}</Text>
                 </Pressable>
               ))}
             </View>
 
             {/* Suggestions rapides */}
-            <Text style={{ color: "#aaa", marginBottom: 6 }}>Suggestions rapides</Text>
-            <View style={{ marginBottom: 16 }}>
+            <Text style={{ 
+              color: theme.colors.textSecondary, 
+              ...theme.typography.caption, 
+              marginBottom: theme.spacing.xs 
+            }}>Suggestions rapides</Text>
+            <View style={{ marginBottom: theme.spacing.md }}>
               {COMMON_INGREDIENTS[newItemCategory as keyof typeof COMMON_INGREDIENTS]?.slice(0, 6).map((item, index) => (
                 <Pressable
                   key={index}
@@ -416,16 +493,19 @@ export default function Shopping() {
                     setNewItemUnit(item.unit);
                   }}
                   style={{
-                    backgroundColor: "#1a1a1a",
-                    paddingHorizontal: 12,
-                    paddingVertical: 8,
-                    borderRadius: 8,
-                    marginBottom: 6,
+                    backgroundColor: theme.colors.surface,
+                    paddingHorizontal: theme.spacing.sm,
+                    paddingVertical: theme.spacing.xs,
+                    borderRadius: theme.borderRadius.md,
+                    marginBottom: theme.spacing.xs,
                     borderWidth: 1,
-                    borderColor: "#333",
+                    borderColor: theme.colors.border,
                   }}
                 >
-                                     <Text style={{ color: "#fff", fontSize: 12 }}>
+                  <Text style={{ 
+                    color: theme.colors.text, 
+                    ...theme.typography.caption 
+                  }}>
                      {item.name} ({item.quantity} {item.unit})
                    </Text>
                 </Pressable>
@@ -436,45 +516,49 @@ export default function Shopping() {
             <Pressable
               onPress={handleAddItem}
               style={{
-                backgroundColor: "#0070F3",
-                paddingVertical: 12,
-                borderRadius: 8,
-                alignItems: "center",
+                ...theme.button.primary,
               }}
             >
-              <Text style={{ color: "#fff", fontWeight: "700" }}>Ajouter à la liste</Text>
+              <Text style={{ 
+                color: theme.colors.text, 
+                ...theme.typography.button 
+              }}>Ajouter à la liste</Text>
             </Pressable>
           </View>
         )}
 
         {/* Actions */}
-        <View style={{ flexDirection: "row", gap: 8, marginBottom: 20 }}>
+        <View style={{ 
+          flexDirection: "row", 
+          gap: theme.spacing.sm, 
+          marginBottom: theme.spacing.lg 
+        }}>
           <Pressable
             onPress={handleShare}
             style={({ pressed }) => ({
               flex: 1,
-              backgroundColor: pressed ? "#0057c0" : "#0070F3",
-              paddingVertical: 12,
-              borderRadius: 12,
-              alignItems: "center",
+              ...theme.button.secondary,
+              opacity: pressed ? 0.8 : 1,
             })}
           >
-            <Text style={{ color: "#fff", fontWeight: "700" }}>Partager 📤</Text>
+            <Text style={{ 
+              color: theme.colors.primary, 
+              ...theme.typography.button 
+            }}>Partager</Text>
           </Pressable>
           
           <Pressable
             onPress={handleCopyToClipboard}
             style={({ pressed }) => ({
               flex: 1,
-              backgroundColor: pressed ? "#222" : "#1b1b1b",
-              paddingVertical: 12,
-              borderRadius: 12,
-              alignItems: "center",
-              borderWidth: 1,
-              borderColor: "#2a2a2a",
+              ...theme.button.secondary,
+              opacity: pressed ? 0.8 : 1,
             })}
           >
-            <Text style={{ color: "#fff", fontWeight: "700" }}>Copier 📋</Text>
+            <Text style={{ 
+              color: theme.colors.primary, 
+              ...theme.typography.button 
+            }}>Copier</Text>
           </Pressable>
         </View>
 
@@ -483,25 +567,36 @@ export default function Shopping() {
           <Pressable
             onPress={handleClearChecked}
             style={({ pressed }) => ({
-              backgroundColor: pressed ? "#3a0f14" : "#2a2a2a",
-              paddingVertical: 12,
-              borderRadius: 12,
+              backgroundColor: pressed ? "#3a0f14" : theme.colors.surface,
+              paddingVertical: theme.spacing.md,
+              borderRadius: theme.borderRadius.lg,
               alignItems: "center",
-              marginBottom: 20,
+              marginBottom: theme.spacing.lg,
               borderWidth: 1,
               borderColor: "#3a0f14",
             })}
           >
-            <Text style={{ color: "#ff6b6b", fontWeight: "700" }}>
-              🧹 Vider les articles cochés ({checkedItems})
+            <Text style={{ 
+              color: "#ff6b6b", 
+              ...theme.typography.button 
+            }}>
+              Vider les articles cochés ({checkedItems})
             </Text>
           </Pressable>
         )}
 
         {/* Liste des ingrédients */}
         {totalItems === 0 ? (
-          <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 60 }}>
-            <Text style={{ color: "#888", fontSize: 16, textAlign: "center" }}>
+          <View style={{ 
+            alignItems: "center", 
+            justifyContent: "center", 
+            paddingVertical: theme.spacing.xxl 
+          }}>
+            <Text style={{ 
+              color: theme.colors.textTertiary, 
+              ...theme.typography.body, 
+              textAlign: "center" 
+            }}>
               Votre liste de courses est vide !{'\n'}
               Ajoutez des ingrédients manuellement ou{'\n'}
               depuis le chat IA.
@@ -510,12 +605,23 @@ export default function Shopping() {
         ) : (
           <View>
             {Object.entries(itemsByCategory).map(([category, items]) => (
-              <View key={category} style={{ marginBottom: 20 }}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                  <Text style={{ color: "#fff", fontWeight: "800", fontSize: 18 }}>
+              <View key={category} style={{ marginBottom: theme.spacing.lg }}>
+                <View style={{ 
+                  flexDirection: "row", 
+                  justifyContent: "space-between", 
+                  alignItems: "center", 
+                  marginBottom: theme.spacing.sm 
+                }}>
+                  <Text style={{ 
+                    color: theme.colors.text, 
+                    ...theme.typography.h4 
+                  }}>
                     {category}
                   </Text>
-                  <Text style={{ color: "#aaa", fontSize: 14 }}>
+                  <Text style={{ 
+                    color: theme.colors.textSecondary, 
+                    ...theme.typography.caption 
+                  }}>
                     {items.filter(item => item.checked).length}/{items.length}
                   </Text>
                 </View>
@@ -524,12 +630,12 @@ export default function Shopping() {
                   <View
                     key={item.id}
                     style={{
-                      backgroundColor: item.checked ? "#1a3a1a" : "#111",
-                      borderColor: item.checked ? "#2d5a2d" : "#1d1d1d",
+                      backgroundColor: item.checked ? "#1a3a1a" : theme.colors.surface,
+                      borderColor: item.checked ? "#2d5a2d" : theme.colors.border,
                       borderWidth: 1,
-                      borderRadius: 12,
-                      padding: 16,
-                      marginBottom: 8,
+                      borderRadius: theme.borderRadius.lg,
+                      padding: theme.spacing.md,
+                      marginBottom: theme.spacing.sm,
                       flexDirection: "row",
                       alignItems: "center",
                     }}
@@ -542,31 +648,38 @@ export default function Shopping() {
                         height: 24,
                         borderRadius: 12,
                         borderWidth: 2,
-                        borderColor: item.checked ? "#4CAF50" : "#666",
+                        borderColor: item.checked ? "#4CAF50" : theme.colors.textTertiary,
                         backgroundColor: item.checked ? "#4CAF50" : "transparent",
-                        marginRight: 16,
+                        marginRight: theme.spacing.md,
                         alignItems: "center",
                         justifyContent: "center",
                         opacity: loading ? 0.5 : 1,
                       }}
                     >
                       {item.checked && (
-                        <Text style={{ color: "#fff", fontSize: 16, fontWeight: "bold" }}>✓</Text>
+                        <Text style={{ 
+                          color: theme.colors.text, 
+                          fontSize: 16, 
+                          fontWeight: "bold" 
+                        }}>✓</Text>
                       )}
                     </Pressable>
                     
                     <View style={{ flex: 1 }}>
                       <Text
                         style={{
-                          color: item.checked ? "#888" : "#fff",
-                          fontWeight: "600",
-                          fontSize: 16,
+                          color: item.checked ? theme.colors.textTertiary : theme.colors.text,
+                          ...theme.typography.body,
                           textDecorationLine: item.checked ? "line-through" : "none",
                         }}
                       >
                         {item.name}
                       </Text>
-                      <Text style={{ color: "#aaa", marginTop: 4 }}>
+                      <Text style={{ 
+                        color: theme.colors.textSecondary, 
+                        marginTop: theme.spacing.xs,
+                        ...theme.typography.caption 
+                      }}>
                         {item.quantity}
                         {item.unit && ` ${item.unit}`}
                       </Text>
@@ -576,12 +689,15 @@ export default function Shopping() {
                       onPress={() => handleRemove(item.id)}
                       style={{
                         backgroundColor: "#3a0f14",
-                        paddingHorizontal: 12,
-                        paddingVertical: 8,
-                        borderRadius: 8,
+                        paddingHorizontal: theme.spacing.sm,
+                        paddingVertical: theme.spacing.xs,
+                        borderRadius: theme.borderRadius.md,
                       }}
                     >
-                      <Text style={{ color: "#ff6b6b", fontWeight: "700" }}>×</Text>
+                      <Text style={{ 
+                        color: "#ff6b6b", 
+                        ...theme.typography.button 
+                      }}>×</Text>
                     </Pressable>
                   </View>
                 ))}
