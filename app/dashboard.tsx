@@ -10,6 +10,7 @@ import { DailyIntake, estimateKcalTarget, loadDailyIntake, saveDailyIntake } fro
 import { latestByType, SavedPlan } from "../lib/plans";
 import { loadDailyHistory, loadProfile, saveDailyHistory, saveDailyMeal, UserProfile } from "../lib/profile";
 import { checkAndResetIfNewDay, checkHealthPermissions, DailySteps, getDailyStepsTarget, getStepsFromSensor, saveDailySteps } from "../lib/steps";
+import { calculateWorkoutCalories } from "../lib/workout-calories";
 
 
 export default function Dashboard() {
@@ -105,17 +106,10 @@ export default function Dashboard() {
     return firstLine || 'Séance sans titre';
   };
 
-  // Fonction pour estimer les calories d'une séance
+  // Fonction pour estimer les calories d'une séance (utilise la nouvelle fonction précise)
   const estimateWorkoutCalories = (content: string, profile: UserProfile | null): number => {
-    if (!profile) return 300; // Estimation par défaut
-    
-    // Estimation basée sur la durée et le poids
-    const duration = 45; // Durée par défaut en minutes
-    const weight = profile.weight || 70; // Poids par défaut
-    
-    // Estimation : 8-12 calories par minute selon l'intensité
-    const caloriesPerMinute = (weight / 70) * 10; // Ajustement selon le poids
-    return Math.round(duration * caloriesPerMinute);
+    const result = calculateWorkoutCalories(content, profile);
+    return result.calories;
   };
 
   // Fonction pour extraire les sections d'une séance
@@ -927,18 +921,20 @@ export default function Dashboard() {
     }
   };
 
-  const importWorkout = async (workout: { id: string; title: string; content: string; date: string }) => {
+  const importWorkout = async (workout: { id: string; title: string; content: string; date: string; calories?: number }) => {
     // Déterminer le type de séance : alterner entre matin et soir, ou matin si c'est la première
     const sessionType: 'morning' | 'evening' = dailyWorkouts.length === 0 ? 'morning' : 
       (dailyWorkouts.length % 2 === 0 ? 'morning' : 'evening');
-    const estimatedCalories = estimateWorkoutCalories(workout.content, profile);
+    
+    // Utiliser les calories stockées ou calculer si pas disponibles
+    const calories = workout.calories || estimateWorkoutCalories(workout.content, profile);
     
     const newWorkout = {
       id: `daily_${Date.now()}`,
       title: workout.title,
       content: workout.content,
       duration: 45,
-      calories: estimatedCalories,
+      calories: calories,
       completed: false,
       sessionType
     };
@@ -2011,7 +2007,7 @@ export default function Dashboard() {
               alignItems: "center",
                 }}
               >
-                <Text style={{ color: "#fff", fontWeight: "600" }}>Importer depuis mes repas enregistrés</Text>
+                <Text style={{ color: "#fff", fontWeight: "600" }}>Importer</Text>
               </Pressable>
               
           <Pressable

@@ -8,8 +8,9 @@ export type SavedPlan = {
   id: string;
   type: PlanType;
   title: string;      // Exemple : "Séance 45 min Full Body" ou "Menu ~2000 kcal"
-  content: string;    // Texte complet de l’IA
+  content: string;    // Texte complet de l'IA
   dateISO: string;    // Date de création en ISO (new Date().toISOString())
+  calories?: number;  // Calories estimées pour les séances
 };
 
 const KEY = "the_sport_saved_plans_v1";

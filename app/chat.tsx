@@ -1,11 +1,12 @@
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useEffect, useRef, useState } from "react";
-import { FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from "react-native";
+import { FlatList, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from "react-native";
 import { checkAndResetDailyChat, loadChatMessages, Message, saveChatMessages } from "../lib/chat";
 import { estimateMealNutrition } from "../lib/meal-nutrition";
 import { estimateKcalTarget } from "../lib/nutrition";
 import { loadProfile, saveDailyMeal, savePlan, saveProfile, UserProfile } from "../lib/profile";
 import { addShoppingItem, extractIngredientsFromAIResponse } from "../lib/shopping";
+import { calculateWorkoutCalories } from "../lib/workout-calories";
 
 // ✅ Endpoint Vercel (prod)
 const endpoint =
@@ -847,7 +848,8 @@ export default function Chat() {
           <Text style={{ color: "#fff", fontSize: 22, fontWeight: "800" }}>
             Ton coach IA
         </Text>
-          <View style={{ flexDirection: "row", gap: 8 }}>
+          {/* Boutons masqués */}
+          {/* <View style={{ flexDirection: "row", gap: 8 }}>
             <Pressable
               onPress={() => {
                 if (listRef.current) {
@@ -880,7 +882,7 @@ export default function Chat() {
                 Fermer clavier
             </Text>
             </Pressable>
-          </View>
+          </View> */}
         </View>
 
 
@@ -1151,13 +1153,20 @@ export default function Chat() {
                   onPress={async () => {
                     const workoutTitle = extractWorkoutTitle(lastAIResponse?.text || '');
                     const workoutContent = cleanWorkoutContent(lastAIResponse?.text || '');
-                    const success = await savePlan('workout', workoutTitle, workoutContent);
+                    
+                    // Calculer les calories de la séance
+                    const calorieCalculation = calculateWorkoutCalories(workoutContent, profile);
+                    
+                    // Ajouter les informations de calories au contenu
+                    const workoutContentWithCalories = `${workoutContent}\n\n---\nCalories estimées: ${calorieCalculation.calories} kcal\nDurée: ${calorieCalculation.duration} min\nIntensité: ${calorieCalculation.intensity}\nType d'activité: ${calorieCalculation.activityType}`;
+                    
+                    const success = await savePlan('workout', workoutTitle, workoutContentWithCalories);
                     if (success) {
                       const updatedProfile = await loadProfile();
                       setProfile(updatedProfile);
                       const confirmMessage: Message = {
                         id: `confirm_${Date.now()}`,
-                        text: "Séance enregistrée dans tes plans !",
+                        text: `Séance enregistrée dans tes plans ! (${calorieCalculation.calories} kcal estimées)`,
                         sender: "ai",
                       };
                       setMessages(prev => [...prev, confirmMessage]);

@@ -234,11 +234,21 @@ export async function savePlan(type: 'workout' | 'meal', title: string, content:
     const savedPlans = profile.saved_plans || { workouts: [], meals: [] };
     console.log(`📦 Current saved plans:`, savedPlans);
     
+    // Extraire les calories si c'est une séance
+    let calories = 0;
+    if (type === 'workout') {
+      const calorieMatch = content.match(/Calories estimées:\s*(\d+)\s*kcal/);
+      if (calorieMatch) {
+        calories = parseInt(calorieMatch[1]);
+      }
+    }
+
     const newPlan = {
       id: Date.now().toString(),
       title,
       content,
       date: new Date().toISOString(),
+      ...(type === 'workout' && calories > 0 && { calories }),
     };
 
     if (type === 'workout') {
@@ -261,7 +271,8 @@ export async function savePlan(type: 'workout' | 'meal', title: string, content:
       await addPlan({
         type,
         title,
-        content
+        content,
+        ...(type === 'workout' && calories > 0 && { calories })
       });
       console.log(`✅ Plan also saved to lib/plans.ts for compatibility`);
     } catch (syncError) {
