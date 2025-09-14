@@ -1,7 +1,9 @@
+import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
     Alert,
+    Image,
     Modal,
     Platform,
     Pressable,
@@ -219,10 +221,27 @@ export default function Profile() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [userEmail, setUserEmail] = useState('');
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [showAccountInfoModal, setShowAccountInfoModal] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState('');
 
   useEffect(() => {
     loadUserProfile();
   }, []);
+
+  // Charger la photo de profil depuis le profil sauvegardé
+  useEffect(() => {
+    if (profile?.profileImage) {
+      setProfileImage(profile.profileImage);
+    }
+  }, [profile]);
+
+  // Charger le numéro de téléphone depuis le profil
+  useEffect(() => {
+    if (profile?.phone) {
+      setPhoneNumber(profile.phone);
+    }
+  }, [profile]);
 
   // Fermer toutes les listes déroulantes quand on sort du mode édition
   useEffect(() => {
@@ -532,6 +551,112 @@ export default function Profile() {
     );
   };
 
+  const handleSelectProfileImage = async () => {
+    try {
+      // Demander les permissions
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (permissionResult.granted === false) {
+        Alert.alert("Permission requise", "L'accès à la galerie est nécessaire pour sélectionner une photo de profil.");
+        return;
+      }
+
+      // Afficher les options (galerie ou appareil photo)
+      Alert.alert(
+        "Sélectionner une photo",
+        "Choisissez une source pour votre photo de profil",
+        [
+          {
+            text: "Annuler",
+            style: "cancel"
+          },
+          {
+            text: "Galerie",
+            onPress: () => pickImageFromGallery()
+          },
+          {
+            text: "Appareil photo",
+            onPress: () => takePhotoWithCamera()
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Erreur lors de la sélection de photo:', error);
+      Alert.alert('Erreur', 'Impossible d\'accéder à la galerie');
+    }
+  };
+
+  const pickImageFromGallery = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setProfileImage(result.assets[0].uri);
+        // Ici vous pourriez sauvegarder l'URI dans le profil utilisateur
+        if (profile) {
+          const updatedProfile = { ...profile, profileImage: result.assets[0].uri };
+          await saveProfile(updatedProfile);
+          setProfile(updatedProfile);
+        }
+        Alert.alert("Succès", "Photo de profil mise à jour !");
+      }
+    } catch (error) {
+      console.error('Erreur lors de la sélection depuis la galerie:', error);
+      Alert.alert('Erreur', 'Impossible de sélectionner la photo');
+    }
+  };
+
+  const takePhotoWithCamera = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+      
+      if (permissionResult.granted === false) {
+        Alert.alert("Permission requise", "L'accès à l'appareil photo est nécessaire pour prendre une photo.");
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setProfileImage(result.assets[0].uri);
+        // Ici vous pourriez sauvegarder l'URI dans le profil utilisateur
+        if (profile) {
+          const updatedProfile = { ...profile, profileImage: result.assets[0].uri };
+          await saveProfile(updatedProfile);
+          setProfile(updatedProfile);
+        }
+        Alert.alert("Succès", "Photo de profil mise à jour !");
+      }
+    } catch (error) {
+      console.error('Erreur lors de la prise de photo:', error);
+      Alert.alert('Erreur', 'Impossible de prendre la photo');
+    }
+  };
+
+  const handleSaveAccountInfo = async () => {
+    if (!profile) return;
+
+    try {
+      const updatedProfile = { ...profile, phone: phoneNumber };
+      await saveProfile(updatedProfile);
+      setProfile(updatedProfile);
+      setShowAccountInfoModal(false);
+      Alert.alert("Succès", "Informations de compte mises à jour !");
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde des informations de compte:', error);
+      Alert.alert('Erreur', 'Impossible de sauvegarder les informations');
+    }
+  };
+
   return (
     <ScrollView style={{ flex: 1, backgroundColor: "#000" }} contentContainerStyle={{ paddingTop: 60, paddingHorizontal: 16, paddingBottom: 20 }}>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
@@ -566,6 +691,291 @@ export default function Profile() {
         Gère tes informations et préférences
       </Text>
 
+      {/* Section Plans sauvegardés */}
+      <View style={{ 
+        backgroundColor: "#111", 
+        borderRadius: 16, 
+        padding: 20, 
+        marginBottom: 20
+      }}>
+        <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700", marginBottom: 16 }}>
+          Mes plans enregistrés
+        </Text>
+        
+        {/* Séances sauvegardées */}
+        <View style={{ marginBottom: 16 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <Text style={{ color: "#60A5FA", fontSize: 16, fontWeight: "600" }}>
+              Séances ({profile?.saved_plans?.workouts?.length || 0})
+            </Text>
+            {(profile?.saved_plans?.workouts?.length || 0) > 0 && (
+              <Pressable
+                onPress={deleteAllWorkouts}
+                style={{
+                  backgroundColor: "#2a1a1a",
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderColor: "#4a2a2a"
+                }}
+              >
+                <Text style={{ color: "#ff6666", fontSize: 12, fontWeight: "600" }}>
+                  Tout supprimer
+                </Text>
+              </Pressable>
+            )}
+          </View>
+          {profile?.saved_plans?.workouts?.length ? (
+            <ScrollView 
+              style={{ maxHeight: 200 }}
+              showsVerticalScrollIndicator={false}
+              nestedScrollEnabled={true}
+            >
+              {profile.saved_plans.workouts.slice().reverse().map((workout) => {
+              const cleanedContent = cleanWorkoutContent(workout.content);
+              
+              return (
+                <Pressable
+                  key={workout.id}
+                  onPress={() => openPlanDetail('workout', workout)}
+                  style={{ 
+                    backgroundColor: "#1a1f2e", 
+                    padding: 12, 
+                    borderRadius: 8, 
+                    marginBottom: 8,
+                    borderLeftWidth: 3,
+                    borderLeftColor: "#60A5FA"
+                  }}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "600", fontSize: 14 }}>
+                    {workout.title}
+                  </Text>
+                  <Text style={{ color: "#aaa", fontSize: 12, marginTop: 4 }}>
+                    Sauvegardé le {new Date(workout.date).toLocaleDateString('fr-FR', {
+                      day: 'numeric',
+                      month: 'short',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </Text>
+                  <Text style={{ color: "#888", fontSize: 11, marginTop: 2, fontStyle: "italic" }}>
+                    {cleanedContent.substring(0, 100)}...
+                  </Text>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+                    <Text style={{ color: "#60A5FA", fontSize: 10, fontWeight: "600" }}>
+                      Appuyer pour voir le détail
+                    </Text>
+                    <Pressable
+                      onPress={async (e) => {
+                        e.stopPropagation(); // Empêcher l'ouverture de la modal
+                        console.log(`Delete workout from list: ${workout.title}`);
+                        
+                        // Pour la simulation sur ordinateur, on peut bypasser l'Alert
+                        const isSimulator = __DEV__ && Platform.OS === 'web';
+                        
+                        if (isSimulator) {
+                          // Suppression directe en simulation
+                          console.log(`Simulator mode: deleting workout directly`);
+                          const success = await deletePlan('workout', workout.id);
+                          if (success) {
+                            loadUserProfile();
+                          }
+                          return;
+                        }
+                        
+                        Alert.alert(
+                          "Supprimer la séance",
+                          `Êtes-vous sûr de vouloir supprimer "${workout.title}" ?`,
+                          [
+                            { text: "Annuler", style: "cancel" },
+                            {
+                              text: "Supprimer",
+                              style: "destructive",
+                              onPress: async () => {
+                                console.log(`User confirmed deletion of workout: ${workout.title}`);
+                                const success = await deletePlan('workout', workout.id);
+                                if (success) {
+                                  loadUserProfile();
+                                }
+                              }
+                            }
+                          ]
+                        );
+                      }}
+                      style={{
+                        backgroundColor: "#1a2a4a",
+                        paddingHorizontal: 6,
+                        paddingVertical: 4,
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderColor: "#60A5FA"
+                      }}
+                    >
+                      <Text style={{ color: "#60A5FA", fontSize: 10, fontWeight: "600" }}>🗑</Text>
+                    </Pressable>
+                  </View>
+                </Pressable>
+              );
+              })}
+            </ScrollView>
+          ) : (
+            <View style={{ 
+              backgroundColor: "#1a1a1a", 
+              padding: 16, 
+              borderRadius: 8,
+              alignItems: "center"
+            }}>
+              <Text style={{ color: "#666", fontSize: 14, fontStyle: "italic" }}>
+                Aucune séance sauvegardée
+              </Text>
+              <Text style={{ color: "#555", fontSize: 12, marginTop: 4 }}>
+                Demande une séance dans le chat pour l'enregistrer ici
+              </Text>
+            </View>
+          )}
+        </View>
+        
+        {/* Repas sauvegardés */}
+        <View>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <Text style={{ color: "#3B82F6", fontSize: 16, fontWeight: "600" }}>
+              Repas ({profile?.saved_plans?.meals?.length || 0})
+            </Text>
+            {(profile?.saved_plans?.meals?.length || 0) > 0 && (
+              <Pressable
+                onPress={deleteAllMeals}
+                style={{
+                  backgroundColor: "#2a1a1a",
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderColor: "#4a2a2a"
+                }}
+              >
+                <Text style={{ color: "#ff6666", fontSize: 12, fontWeight: "600" }}>
+                  Tout supprimer
+                </Text>
+              </Pressable>
+            )}
+          </View>
+          {profile?.saved_plans?.meals?.length ? (
+            <ScrollView 
+              style={{ maxHeight: 200 }}
+              showsVerticalScrollIndicator={false}
+              nestedScrollEnabled={true}
+            >
+              {profile.saved_plans.meals.slice().reverse().map((meal) => {
+              const mealType = getMealType(meal.content);
+              const extractedTitle = extractMealTitle(meal.content);
+              const cleanedContent = cleanMealContent(meal.content);
+              
+              return (
+                <Pressable
+                  key={meal.id}
+                  onPress={() => openPlanDetail('meal', {
+                    ...meal,
+                    title: meal.title,
+                    content: cleanedContent
+                  })}
+                  style={{ 
+                    backgroundColor: "#1a1f3a", 
+                    padding: 12, 
+                    borderRadius: 8, 
+                    marginBottom: 8,
+                    borderLeftWidth: 3,
+                    borderLeftColor: "#3B82F6"
+                  }}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "600", fontSize: 14 }}>
+                    {meal.title}
+                  </Text>
+                  <Text style={{ color: "#aaa", fontSize: 12, marginTop: 4 }}>
+                    Sauvegardé le {new Date(meal.date).toLocaleDateString('fr-FR', {
+                      day: 'numeric',
+                      month: 'short',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </Text>
+                  <Text style={{ color: "#888", fontSize: 11, marginTop: 2, fontStyle: "italic" }}>
+                    {cleanedContent.substring(0, 100)}...
+                  </Text>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+                    <Text style={{ color: "#3B82F6", fontSize: 10, fontWeight: "600" }}>
+                      Appuyer pour voir le détail
+                    </Text>
+                    <Pressable
+                      onPress={async (e) => {
+                        e.stopPropagation(); // Empêcher l'ouverture de la modal
+                        console.log(`Delete meal from list: ${extractedTitle}`);
+                        
+                        // Pour la simulation sur ordinateur, on peut bypasser l'Alert
+                        const isSimulator = __DEV__ && Platform.OS === 'web';
+                        
+                        if (isSimulator) {
+                          // Suppression directe en simulation
+                          console.log(`Simulator mode: deleting meal directly`);
+                          const success = await deletePlan('meal', meal.id);
+                          if (success) {
+                            loadUserProfile();
+                          }
+                          return;
+                        }
+                        
+                        Alert.alert(
+                          "Supprimer le repas",
+                          `Êtes-vous sûr de vouloir supprimer "${extractedTitle}" ?`,
+                          [
+                            { text: "Annuler", style: "cancel" },
+                            {
+                              text: "Supprimer",
+                              style: "destructive",
+                              onPress: async () => {
+                                console.log(`User confirmed deletion of meal: ${extractedTitle}`);
+                                const success = await deletePlan('meal', meal.id);
+                                if (success) {
+                                  loadUserProfile();
+                                }
+                              }
+                            }
+                          ]
+                        );
+                      }}
+                      style={{
+                        backgroundColor: "#1a1f3a",
+                        paddingHorizontal: 6,
+                        paddingVertical: 4,
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderColor: "#3B82F6"
+                      }}
+                    >
+                      <Text style={{ color: "#3B82F6", fontSize: 10, fontWeight: "600" }}>🗑</Text>
+                    </Pressable>
+                  </View>
+                </Pressable>
+              );
+              })}
+            </ScrollView>
+          ) : (
+            <View style={{ 
+              backgroundColor: "#1a1a1a", 
+              padding: 16, 
+              borderRadius: 8,
+              alignItems: "center"
+            }}>
+              <Text style={{ color: "#666", fontSize: 14, fontStyle: "italic" }}>
+                Aucun repas sauvegardé
+              </Text>
+              <Text style={{ color: "#555", fontSize: 12, marginTop: 4 }}>
+                Demande un repas dans le chat pour l'enregistrer ici
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
 
       {/* Section Informations personnelles */}
       <View style={{ 
@@ -1223,293 +1633,31 @@ export default function Profile() {
       <View style={{ marginBottom: 20 }}>
 
 
-        {/* Section Plans sauvegardés */}
-        <View style={{ 
-          backgroundColor: "#111", 
-          borderRadius: 16, 
-          padding: 20, 
-          marginBottom: 20
-        }}>
-          <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700", marginBottom: 16 }}>
-            Mes plans enregistrés
-          </Text>
-          
-          {/* Séances sauvegardées */}
-          <View style={{ marginBottom: 16 }}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <Text style={{ color: "#60A5FA", fontSize: 16, fontWeight: "600" }}>
-                Séances ({profile?.saved_plans?.workouts?.length || 0})
-              </Text>
-              {(profile?.saved_plans?.workouts?.length || 0) > 0 && (
-                <Pressable
-                  onPress={deleteAllWorkouts}
-                  style={{
-                    backgroundColor: "#2a1a1a",
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 6,
-                    borderWidth: 1,
-                    borderColor: "#4a2a2a"
-                  }}
-                >
-                  <Text style={{ color: "#ff6666", fontSize: 12, fontWeight: "600" }}>
-                    Tout supprimer
-                  </Text>
-                </Pressable>
-              )}
-            </View>
-            {profile?.saved_plans?.workouts?.length ? (
-              <ScrollView 
-                style={{ maxHeight: 200 }}
-                showsVerticalScrollIndicator={false}
-                nestedScrollEnabled={true}
-              >
-                {profile.saved_plans.workouts.slice().reverse().map((workout) => {
-                const cleanedContent = cleanWorkoutContent(workout.content);
-                
-                return (
-                  <Pressable
-                    key={workout.id}
-                    onPress={() => openPlanDetail('workout', workout)}
-                    style={{ 
-                      backgroundColor: "#1a1f2e", 
-                      padding: 12, 
-                      borderRadius: 8, 
-                      marginBottom: 8,
-                      borderLeftWidth: 3,
-                      borderLeftColor: "#60A5FA"
-                    }}
-                  >
-                    <Text style={{ color: "#fff", fontWeight: "600", fontSize: 14 }}>
-                      {workout.title}
-                    </Text>
-                    <Text style={{ color: "#aaa", fontSize: 12, marginTop: 4 }}>
-                      Sauvegardé le {new Date(workout.date).toLocaleDateString('fr-FR', {
-                        day: 'numeric',
-                        month: 'short',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </Text>
-                    <Text style={{ color: "#888", fontSize: 11, marginTop: 2, fontStyle: "italic" }}>
-                      {cleanedContent.substring(0, 100)}...
-                    </Text>
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
-                      <Text style={{ color: "#60A5FA", fontSize: 10, fontWeight: "600" }}>
-                        Appuyer pour voir le détail
-                      </Text>
-                      <Pressable
-                        onPress={async (e) => {
-                          e.stopPropagation(); // Empêcher l'ouverture de la modal
-                          console.log(`Delete workout from list: ${workout.title}`);
-                          
-                          // Pour la simulation sur ordinateur, on peut bypasser l'Alert
-                          const isSimulator = __DEV__ && Platform.OS === 'web';
-                          
-                          if (isSimulator) {
-                            // Suppression directe en simulation
-                            console.log(`Simulator mode: deleting workout directly`);
-                            const success = await deletePlan('workout', workout.id);
-                            if (success) {
-                              loadUserProfile();
-                            }
-                            return;
-                          }
-                          
-                          Alert.alert(
-                            "Supprimer la séance",
-                            `Êtes-vous sûr de vouloir supprimer "${workout.title}" ?`,
-                            [
-                              { text: "Annuler", style: "cancel" },
-                              {
-                                text: "Supprimer",
-                                style: "destructive",
-                                onPress: async () => {
-                                  console.log(`User confirmed deletion of workout: ${workout.title}`);
-                                  const success = await deletePlan('workout', workout.id);
-                                  if (success) {
-                                    loadUserProfile();
-                                  }
-                                }
-                              }
-                            ]
-                          );
-                        }}
-                        style={{
-                          backgroundColor: "#1a2a4a",
-                          paddingHorizontal: 6,
-                          paddingVertical: 4,
-                          borderRadius: 4,
-                          borderWidth: 1,
-                          borderColor: "#60A5FA"
-                        }}
-                      >
-                        <Text style={{ color: "#60A5FA", fontSize: 10, fontWeight: "600" }}>🗑</Text>
-                      </Pressable>
-                    </View>
-                  </Pressable>
-                );
-                })}
-              </ScrollView>
-            ) : (
-              <View style={{ 
-                backgroundColor: "#1a1a1a", 
-                padding: 16, 
-                borderRadius: 8,
-                alignItems: "center"
-              }}>
-                <Text style={{ color: "#666", fontSize: 14, fontStyle: "italic" }}>
-                  Aucune séance sauvegardée
-                </Text>
-                <Text style={{ color: "#555", fontSize: 12, marginTop: 4 }}>
-                  Demande une séance dans le chat pour l'enregistrer ici
-                </Text>
-              </View>
-            )}
-          </View>
-          
-          {/* Repas sauvegardés */}
-          <View>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <Text style={{ color: "#3B82F6", fontSize: 16, fontWeight: "600" }}>
-                Repas ({profile?.saved_plans?.meals?.length || 0})
-              </Text>
-              {(profile?.saved_plans?.meals?.length || 0) > 0 && (
-                <Pressable
-                  onPress={deleteAllMeals}
-                  style={{
-                    backgroundColor: "#2a1a1a",
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 6,
-                    borderWidth: 1,
-                    borderColor: "#4a2a2a"
-                  }}
-                >
-                  <Text style={{ color: "#ff6666", fontSize: 12, fontWeight: "600" }}>
-                    Tout supprimer
-                  </Text>
-                </Pressable>
-              )}
-            </View>
-            {profile?.saved_plans?.meals?.length ? (
-              <ScrollView 
-                style={{ maxHeight: 200 }}
-                showsVerticalScrollIndicator={false}
-                nestedScrollEnabled={true}
-              >
-                {profile.saved_plans.meals.slice().reverse().map((meal) => {
-                const mealType = getMealType(meal.content);
-                const extractedTitle = extractMealTitle(meal.content);
-                const cleanedContent = cleanMealContent(meal.content);
-                
-                return (
-                  <Pressable
-                    key={meal.id}
-                    onPress={() => openPlanDetail('meal', {
-                      ...meal,
-                      title: meal.title,
-                      content: cleanedContent
-                    })}
-                    style={{ 
-                      backgroundColor: "#1a1f3a", 
-                      padding: 12, 
-                      borderRadius: 8, 
-                      marginBottom: 8,
-                      borderLeftWidth: 3,
-                      borderLeftColor: "#3B82F6"
-                    }}
-                  >
-                    <Text style={{ color: "#fff", fontWeight: "600", fontSize: 14 }}>
-                      {meal.title}
-                    </Text>
-                    <Text style={{ color: "#aaa", fontSize: 12, marginTop: 4 }}>
-                      Sauvegardé le {new Date(meal.date).toLocaleDateString('fr-FR', {
-                        day: 'numeric',
-                        month: 'short',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </Text>
-                    <Text style={{ color: "#888", fontSize: 11, marginTop: 2, fontStyle: "italic" }}>
-                      {cleanedContent.substring(0, 100)}...
-                    </Text>
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
-                      <Text style={{ color: "#3B82F6", fontSize: 10, fontWeight: "600" }}>
-                        Appuyer pour voir le détail
-                      </Text>
-                      <Pressable
-                        onPress={async (e) => {
-                          e.stopPropagation(); // Empêcher l'ouverture de la modal
-                          console.log(`Delete meal from list: ${extractedTitle}`);
-                          
-                          // Pour la simulation sur ordinateur, on peut bypasser l'Alert
-                          const isSimulator = __DEV__ && Platform.OS === 'web';
-                          
-                          if (isSimulator) {
-                            // Suppression directe en simulation
-                            console.log(`Simulator mode: deleting meal directly`);
-                            const success = await deletePlan('meal', meal.id);
-                            if (success) {
-                              loadUserProfile();
-                            }
-                            return;
-                          }
-                          
-                          Alert.alert(
-                            "Supprimer le repas",
-                            `Êtes-vous sûr de vouloir supprimer "${extractedTitle}" ?`,
-                            [
-                              { text: "Annuler", style: "cancel" },
-                              {
-                                text: "Supprimer",
-                                style: "destructive",
-                                onPress: async () => {
-                                  console.log(`User confirmed deletion of meal: ${extractedTitle}`);
-                                  const success = await deletePlan('meal', meal.id);
-                                  if (success) {
-                                    loadUserProfile();
-                                  }
-                                }
-                              }
-                            ]
-                          );
-                        }}
-                        style={{
-                          backgroundColor: "#1a1f3a",
-                          paddingHorizontal: 6,
-                          paddingVertical: 4,
-                          borderRadius: 4,
-                          borderWidth: 1,
-                          borderColor: "#3B82F6"
-                        }}
-                      >
-                        <Text style={{ color: "#3B82F6", fontSize: 10, fontWeight: "600" }}>🗑</Text>
-                      </Pressable>
-                    </View>
-                  </Pressable>
-                );
-                })}
-              </ScrollView>
-            ) : (
-              <View style={{ 
-                backgroundColor: "#1a1a1a", 
-                padding: 16, 
-                borderRadius: 8,
-                alignItems: "center"
-              }}>
-                <Text style={{ color: "#666", fontSize: 14, fontStyle: "italic" }}>
-                  Aucun repas sauvegardé
-                </Text>
-                <Text style={{ color: "#555", fontSize: 12, marginTop: 4 }}>
-                  Demande un repas dans le chat pour l'enregistrer ici
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
 
 
+
+        {/* Bouton pour réinitialiser l'onboarding du dashboard */}
+        <Pressable
+          onPress={async () => {
+            if (profile) {
+              const updatedProfile = { ...profile, onboardingCompleted: false };
+              await saveProfile(updatedProfile);
+              setProfile(updatedProfile);
+              Alert.alert("Succès", "L'onboarding du dashboard a été réinitialisé !");
+            }
+          }}
+          style={{
+            backgroundColor: "#1a2a4a",
+            paddingVertical: 12,
+            borderRadius: 12,
+            alignItems: "center",
+            borderWidth: 1,
+            borderColor: "#2a4a6a",
+            marginBottom: 12,
+          }}
+        >
+          <Text style={{ color: "#60A5FA", fontWeight: "700" }}>Réinitialiser l'onboarding du dashboard</Text>
+        </Pressable>
 
         {/* Bouton de test pour réinitialiser l'onboarding */}
         <Pressable
@@ -1636,226 +1784,555 @@ export default function Profile() {
             paddingTop: 60,
             paddingHorizontal: 20,
             paddingBottom: 20,
+            backgroundColor: "#111",
             borderBottomWidth: 1,
             borderBottomColor: "#333"
           }}>
-            <Text style={{ color: "#fff", fontSize: 20, fontWeight: "700" }}>
-              Mon compte
-            </Text>
             <Pressable
               onPress={() => setShowAccountModal(false)}
               style={{
-                backgroundColor: "#1a1a1a",
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-                borderRadius: 8,
-                borderWidth: 1,
-                borderColor: "#333"
+                padding: 8,
               }}
             >
-              <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600" }}>
-                Fermer
-              </Text>
+              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "600" }}>←</Text>
             </Pressable>
+            <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700" }}>
+              Mon compte
+            </Text>
+            <View style={{ width: 34 }} />
           </View>
 
-          <ScrollView style={{ flex: 1, padding: 20 }}>
-            {/* Informations du compte */}
+          <ScrollView style={{ flex: 1 }}>
+            {/* Section Profil */}
             <View style={{
               backgroundColor: "#111",
-              borderRadius: 16,
+              marginTop: 20,
+              marginHorizontal: 16,
+              borderRadius: 12,
               padding: 20,
-              marginBottom: 20
+              marginBottom: 16,
+              borderWidth: 1,
+              borderColor: "#333"
             }}>
-              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700", marginBottom: 16 }}>
-                Informations du compte
-              </Text>
-              
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>
-                  Email
+              <View style={{ alignItems: "center", marginBottom: 16 }}>
+                <View style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: 40,
+                  backgroundColor: "#0070F3",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginBottom: 12,
+                  borderWidth: 3,
+                  borderColor: "#333",
+                  overflow: "hidden",
+                }}>
+                  {profileImage || profile?.profileImage ? (
+                    <Image
+                      source={{ uri: profileImage || profile?.profileImage }}
+                      style={{
+                        width: 74,
+                        height: 74,
+                        borderRadius: 37,
+                      }}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <Text style={{ color: "#fff", fontSize: 32, fontWeight: "800" }}>👨‍💼</Text>
+                  )}
+                </View>
+                <Text style={{ color: "#fff", fontSize: 20, fontWeight: "700", marginBottom: 4 }}>
+                  {profile?.first_name || "Utilisateur"}
                 </Text>
-                <Text style={{ color: "#fff", fontSize: 16 }}>
-                  {userEmail || "Chargement..."}
-                </Text>
+                <Pressable
+                  onPress={handleSelectProfileImage}
+                  style={{
+                    backgroundColor: "#1a1a1a",
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                    borderRadius: 20,
+                    borderWidth: 1,
+                    borderColor: "#0070F3",
+                  }}
+                >
+                  <Text style={{ color: "#0070F3", fontSize: 14, fontWeight: "600" }}>
+                    Modifier la photo
+                  </Text>
+                </Pressable>
               </View>
             </View>
 
-            {/* Changer le mot de passe */}
+            {/* Section Informations de compte */}
             <View style={{
               backgroundColor: "#111",
-              borderRadius: 16,
-              padding: 20,
-              marginBottom: 20
+              marginHorizontal: 16,
+              borderRadius: 12,
+              marginBottom: 16,
+              borderWidth: 1,
+              borderColor: "#333"
             }}>
+              <Pressable
+                onPress={() => setShowAccountInfoModal(true)}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  padding: 16,
+                  borderBottomWidth: 1,
+                  borderBottomColor: "#333",
+                }}
+              >
+                <View style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: "#1a1a1a",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginRight: 12,
+                }}>
+                  <Text style={{ color: "#60A5FA", fontSize: 18 }}>👤</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600" }}>
+                    Informations de compte
+                  </Text>
+                  <Text style={{ color: "#aaa", fontSize: 14, marginTop: 2 }}>
+                    {userEmail || "Chargement..."}
+                  </Text>
+                </View>
+                <Text style={{ color: "#aaa", fontSize: 18 }}>›</Text>
+              </Pressable>
+
               <Pressable
                 onPress={() => setShowChangePassword(!showChangePassword)}
                 style={{
-                  backgroundColor: "#1a1a1a",
+                  flexDirection: "row",
+                  alignItems: "center",
                   padding: 16,
-                  borderRadius: 12,
-                  marginBottom: 12,
-                  borderWidth: 1,
-                  borderColor: "#333"
+                  borderBottomWidth: 1,
+                  borderBottomColor: "#333",
                 }}
               >
-                <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600" }}>
-                  Changer le mot de passe
-                </Text>
+                <View style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: "#1a1a1a",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginRight: 12,
+                }}>
+                  <Text style={{ color: "#60A5FA", fontSize: 18 }}>🔐</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600" }}>
+                    Connexion et sécurité
+                  </Text>
+                  <Text style={{ color: "#aaa", fontSize: 14, marginTop: 2 }}>
+                    Mot de passe et authentification
+                  </Text>
+                </View>
+                <Text style={{ color: "#aaa", fontSize: 18 }}>›</Text>
               </Pressable>
 
-              {/* Formulaire de changement de mot de passe */}
-              {showChangePassword && (
-                <View style={{
-                  backgroundColor: "#0a0a0a",
+              <Pressable
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
                   padding: 16,
-                  borderRadius: 12,
-                  marginBottom: 12,
-                  borderWidth: 1,
-                  borderColor: "#333"
+                  borderBottomWidth: 1,
+                  borderBottomColor: "#333",
+                }}
+              >
+                <View style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: "#1a1a1a",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginRight: 12,
                 }}>
-                  <Text style={{ color: "#fff", fontSize: 14, marginBottom: 12 }}>
-                    Mot de passe actuel
-                  </Text>
-                  <TextInput
-                    style={{
-                      backgroundColor: "#1a1a1a",
-                      color: "#fff",
-                      padding: 12,
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: "#333",
-                      marginBottom: 16
-                    }}
-                    value={currentPassword}
-                    onChangeText={setCurrentPassword}
-                    placeholder="Mot de passe actuel"
-                    secureTextEntry
-                    placeholderTextColor="#666"
-                  />
-
-                  <Text style={{ color: "#fff", fontSize: 14, marginBottom: 12 }}>
-                    Nouveau mot de passe
-                  </Text>
-                  <TextInput
-                    style={{
-                      backgroundColor: "#1a1a1a",
-                      color: "#fff",
-                      padding: 12,
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: "#333",
-                      marginBottom: 16
-                    }}
-                    value={newPassword}
-                    onChangeText={setNewPassword}
-                    placeholder="Nouveau mot de passe"
-                    secureTextEntry
-                    placeholderTextColor="#666"
-                  />
-
-                  <Text style={{ color: "#fff", fontSize: 14, marginBottom: 12 }}>
-                    Confirmer le nouveau mot de passe
-                  </Text>
-                  <TextInput
-                    style={{
-                      backgroundColor: "#1a1a1a",
-                      color: "#fff",
-                      padding: 12,
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: "#333",
-                      marginBottom: 16
-                    }}
-                    value={confirmPassword}
-                    onChangeText={setConfirmPassword}
-                    placeholder="Confirmer le nouveau mot de passe"
-                    secureTextEntry
-                    placeholderTextColor="#666"
-                  />
-
-                  <View style={{ flexDirection: "row", gap: 12 }}>
-                    <Pressable
-                      onPress={handleChangePassword}
-                      style={{
-                        backgroundColor: "#0070F3",
-                        paddingHorizontal: 16,
-                        paddingVertical: 12,
-                        borderRadius: 8,
-                        flex: 1
-                      }}
-                    >
-                      <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600", textAlign: "center" }}>
-                        Modifier
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => {
-                        setShowChangePassword(false);
-                        setCurrentPassword('');
-                        setNewPassword('');
-                        setConfirmPassword('');
-                      }}
-                      style={{
-                        backgroundColor: "#333",
-                        paddingHorizontal: 16,
-                        paddingVertical: 12,
-                        borderRadius: 8,
-                        flex: 1
-                      }}
-                    >
-                      <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600", textAlign: "center" }}>
-                        Annuler
-                      </Text>
-                    </Pressable>
-                  </View>
+                  <Text style={{ color: "#60A5FA", fontSize: 18 }}>🔒</Text>
                 </View>
-              )}
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600" }}>
+                    Données et confidentialité
+                  </Text>
+                  <Text style={{ color: "#aaa", fontSize: 14, marginTop: 2 }}>
+                    Gérer vos données personnelles
+                  </Text>
+                </View>
+                <Text style={{ color: "#aaa", fontSize: 18 }}>›</Text>
+              </Pressable>
 
+              <Pressable
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  padding: 16,
+                }}
+              >
+                <View style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: "#1a1a1a",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginRight: 12,
+                }}>
+                  <Text style={{ color: "#60A5FA", fontSize: 18 }}>🔔</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600" }}>
+                    Préférences de notification
+                  </Text>
+                  <Text style={{ color: "#aaa", fontSize: 14, marginTop: 2 }}>
+                    Personnaliser vos notifications
+                  </Text>
+                </View>
+                <Text style={{ color: "#aaa", fontSize: 18 }}>›</Text>
+              </Pressable>
             </View>
 
-            {/* Déconnexion */}
+            {/* Section Aide */}
             <View style={{
               backgroundColor: "#111",
-              borderRadius: 16,
-              padding: 20,
-              marginBottom: 20
+              marginHorizontal: 16,
+              borderRadius: 12,
+              marginBottom: 16,
+              borderWidth: 1,
+              borderColor: "#333"
             }}>
               <Pressable
-                onPress={handleSignOut}
                 style={{
-                  backgroundColor: "#2a1a1a",
+                  flexDirection: "row",
+                  alignItems: "center",
                   padding: 16,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: "#444"
                 }}
               >
-                <Text style={{ color: "#ff6b6b", fontSize: 16, fontWeight: "600" }}>
-                  Se déconnecter
-                </Text>
+                <View style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: "#1a1a1a",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginRight: 12,
+                }}>
+                  <Text style={{ color: "#60A5FA", fontSize: 18 }}>💬</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600" }}>
+                    Aide
+                  </Text>
+                  <Text style={{ color: "#aaa", fontSize: 14, marginTop: 2 }}>
+                    Support et FAQ
+                  </Text>
+                </View>
+                <Text style={{ color: "#aaa", fontSize: 18 }}>›</Text>
               </Pressable>
             </View>
 
-            {/* Supprimer le compte */}
+            {/* Formulaire de changement de mot de passe */}
+            {showChangePassword && (
+              <View style={{
+                backgroundColor: "#111",
+                marginHorizontal: 16,
+                borderRadius: 12,
+                marginBottom: 16,
+                padding: 20,
+                borderWidth: 1,
+                borderColor: "#333"
+              }}>
+                <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700", marginBottom: 16 }}>
+                  Changer le mot de passe
+                </Text>
+                
+                <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>
+                  Mot de passe actuel
+                </Text>
+                <TextInput
+                  style={{
+                    backgroundColor: "#1a1a1a",
+                    color: "#fff",
+                    padding: 12,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: "#333",
+                    marginBottom: 16
+                  }}
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                  placeholder="Mot de passe actuel"
+                  secureTextEntry
+                  placeholderTextColor="#666"
+                />
+
+                <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>
+                  Nouveau mot de passe
+                </Text>
+                <TextInput
+                  style={{
+                    backgroundColor: "#1a1a1a",
+                    color: "#fff",
+                    padding: 12,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: "#333",
+                    marginBottom: 16
+                  }}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  placeholder="Nouveau mot de passe"
+                  secureTextEntry
+                  placeholderTextColor="#666"
+                />
+
+                <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>
+                  Confirmer le nouveau mot de passe
+                </Text>
+                <TextInput
+                  style={{
+                    backgroundColor: "#1a1a1a",
+                    color: "#fff",
+                    padding: 12,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: "#333",
+                    marginBottom: 20
+                  }}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  placeholder="Confirmer le nouveau mot de passe"
+                  secureTextEntry
+                  placeholderTextColor="#666"
+                />
+
+                <View style={{ flexDirection: "row", gap: 12 }}>
+                  <Pressable
+                    onPress={handleChangePassword}
+                    style={{
+                      backgroundColor: "#0070F3",
+                      paddingHorizontal: 16,
+                      paddingVertical: 12,
+                      borderRadius: 8,
+                      flex: 1
+                    }}
+                  >
+                    <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600", textAlign: "center" }}>
+                      Modifier
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      setShowChangePassword(false);
+                      setCurrentPassword('');
+                      setNewPassword('');
+                      setConfirmPassword('');
+                    }}
+                    style={{
+                      backgroundColor: "#333",
+                      paddingHorizontal: 16,
+                      paddingVertical: 12,
+                      borderRadius: 8,
+                      flex: 1
+                    }}
+                  >
+                    <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600", textAlign: "center" }}>
+                      Annuler
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+
+            {/* Section Actions du compte */}
             <View style={{
               backgroundColor: "#111",
-              borderRadius: 16,
-              padding: 20,
-              marginBottom: 20
+              marginHorizontal: 16,
+              borderRadius: 12,
+              marginBottom: 20,
+              borderWidth: 1,
+              borderColor: "#333"
             }}>
               <Pressable
                 onPress={handleDeleteAccount}
                 style={{
-                  backgroundColor: "#2a1a1a",
+                  flexDirection: "row",
+                  alignItems: "center",
                   padding: 16,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: "#ff4444"
+                  borderBottomWidth: 1,
+                  borderBottomColor: "#333",
                 }}
               >
-                <Text style={{ color: "#ff4444", fontSize: 16, fontWeight: "600" }}>
-                  Supprimer le compte
+                <View style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: "#2a1a1a",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginRight: 12,
+                }}>
+                  <Text style={{ color: "#ff4444", fontSize: 18 }}>🗑️</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: "#ff4444", fontSize: 16, fontWeight: "600" }}>
+                    Fermer le compte
+                  </Text>
+                  <Text style={{ color: "#aaa", fontSize: 14, marginTop: 2 }}>
+                    Supprimer définitivement votre compte
+                  </Text>
+                </View>
+                <Text style={{ color: "#aaa", fontSize: 18 }}>›</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={handleSignOut}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  padding: 16,
+                }}
+              >
+                <View style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: "#2a1a1a",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginRight: 12,
+                }}>
+                  <Text style={{ color: "#ff6b6b", fontSize: 18 }}>↗️</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: "#ff6b6b", fontSize: 16, fontWeight: "600" }}>
+                    Déconnexion
+                  </Text>
+                  <Text style={{ color: "#aaa", fontSize: 14, marginTop: 2 }}>
+                    Se déconnecter de votre compte
+                  </Text>
+                </View>
+                <Text style={{ color: "#aaa", fontSize: 18 }}>›</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Modal des informations de compte */}
+      <Modal
+        visible={showAccountInfoModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowAccountInfoModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: "#000" }}>
+          {/* Header de la modal */}
+          <View style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            paddingTop: 60,
+            paddingHorizontal: 20,
+            paddingBottom: 20,
+            backgroundColor: "#111",
+            borderBottomWidth: 1,
+            borderBottomColor: "#333"
+          }}>
+            <Pressable
+              onPress={() => setShowAccountInfoModal(false)}
+              style={{
+                padding: 8,
+              }}
+            >
+              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "600" }}>←</Text>
+            </Pressable>
+            <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700" }}>
+              Informations de compte
+            </Text>
+            <View style={{ width: 34 }} />
+          </View>
+
+          <ScrollView style={{ flex: 1, padding: 20 }}>
+            {/* Section Email */}
+            <View style={{
+              backgroundColor: "#111",
+              borderRadius: 12,
+              padding: 20,
+              marginBottom: 20,
+              borderWidth: 1,
+              borderColor: "#333"
+            }}>
+              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700", marginBottom: 16 }}>
+                Email
+              </Text>
+              <Text style={{ color: "#aaa", fontSize: 16 }}>
+                {userEmail || "Chargement..."}
+              </Text>
+            </View>
+
+            {/* Section Numéro de téléphone */}
+            <View style={{
+              backgroundColor: "#111",
+              borderRadius: 12,
+              padding: 20,
+              marginBottom: 20,
+              borderWidth: 1,
+              borderColor: "#333"
+            }}>
+              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700", marginBottom: 16 }}>
+                Numéro de téléphone
+              </Text>
+              <TextInput
+                style={{
+                  backgroundColor: "#1a1a1a",
+                  color: "#fff",
+                  padding: 12,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: "#333",
+                  fontSize: 16
+                }}
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                placeholder="Entrez votre numéro de téléphone"
+                placeholderTextColor="#666"
+                keyboardType="phone-pad"
+              />
+            </View>
+
+            {/* Boutons d'action */}
+            <View style={{ flexDirection: "row", gap: 12 }}>
+              <Pressable
+                onPress={handleSaveAccountInfo}
+                style={{
+                  backgroundColor: "#0070F3",
+                  paddingHorizontal: 20,
+                  paddingVertical: 12,
+                  borderRadius: 8,
+                  flex: 1
+                }}
+              >
+                <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600", textAlign: "center" }}>
+                  Sauvegarder
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setShowAccountInfoModal(false)}
+                style={{
+                  backgroundColor: "#333",
+                  paddingHorizontal: 20,
+                  paddingVertical: 12,
+                  borderRadius: 8,
+                  flex: 1
+                }}
+              >
+                <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600", textAlign: "center" }}>
+                  Annuler
                 </Text>
               </Pressable>
             </View>

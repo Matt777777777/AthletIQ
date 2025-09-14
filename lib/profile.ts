@@ -14,6 +14,8 @@ export type UserProfile = {
   weight?: number;       // Poids en kg
   height?: number;       // Taille en cm
   gender?: 'male' | 'female'; // Sexe de l'utilisateur
+  profileImage?: string; // URI de la photo de profil
+  phone?: string;        // Numéro de téléphone
   
   // Questions complémentaires du chat IA (réponses exactes)
   fitness_level?: string; // Compatible Supabase
@@ -33,6 +35,9 @@ export type UserProfile = {
   
   // Flag pour indiquer si les questions du chat ont déjà été posées
   chat_questions_asked?: boolean;
+  
+  // Flag pour indiquer si l'onboarding du dashboard a été complété
+  onboardingCompleted?: boolean;
   
   // Plans sauvegardés
   saved_plans?: {

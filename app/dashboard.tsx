@@ -5,10 +5,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import Calendar from "../components/Calendar";
 import DayDetailModal from "../components/DayDetailModal";
+import OnboardingModal from "../components/OnboardingModal";
 import { MealNutrition } from "../lib/meal-nutrition";
 import { DailyIntake, estimateKcalTarget, loadDailyIntake, saveDailyIntake } from "../lib/nutrition";
 import { latestByType, SavedPlan } from "../lib/plans";
-import { loadDailyHistory, loadProfile, saveDailyHistory, saveDailyMeal, UserProfile } from "../lib/profile";
+import { loadDailyHistory, loadProfile, saveDailyHistory, saveDailyMeal, saveProfile, UserProfile } from "../lib/profile";
 import { checkAndResetIfNewDay, checkHealthPermissions, DailySteps, getDailyStepsTarget, getStepsFromSensor, saveDailySteps } from "../lib/steps";
 import { calculateWorkoutCalories } from "../lib/workout-calories";
 
@@ -65,6 +66,9 @@ export default function Dashboard() {
   // États pour l'import de séances
   const [showImportModal, setShowImportModal] = useState(false);
   const [savedWorkouts, setSavedWorkouts] = useState<Array<{ id: string; title: string; content: string; date: string }>>([]);
+  
+  // État pour l'onboarding
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // État pour forcer la mise à jour du cercle de progression
   const [circleKey, setCircleKey] = useState(0);
@@ -508,12 +512,57 @@ export default function Dashboard() {
     }
   }, []);
 
+  // Vérifier si c'est la première visite
+  const checkFirstVisit = async () => {
+    try {
+      // Vérifier d'abord dans le profil si onboardingCompleted est false
+      if (profile && profile.onboardingCompleted === false) {
+        setShowOnboarding(true);
+        return;
+      }
+      
+      // Fallback sur AsyncStorage pour la compatibilité
+      const hasSeenOnboarding = await AsyncStorage.getItem('hasSeenOnboarding');
+      if (!hasSeenOnboarding) {
+        setShowOnboarding(true);
+      }
+    } catch (error) {
+      console.error('Erreur lors de la vérification de la première visite:', error);
+    }
+  };
+
+  // Marquer l'onboarding comme vu
+  const handleOnboardingClose = async () => {
+    try {
+      // Marquer dans le profil
+      if (profile) {
+        const updatedProfile = { ...profile, onboardingCompleted: true };
+        await saveProfile(updatedProfile);
+        setProfile(updatedProfile);
+      }
+      
+      // Marquer dans AsyncStorage pour la compatibilité
+      await AsyncStorage.setItem('hasSeenOnboarding', 'true');
+      setShowOnboarding(false);
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde de l\'onboarding:', error);
+      setShowOnboarding(false);
+    }
+  };
+
   // Recharger les données à chaque fois que l'utilisateur revient sur cet onglet
   useFocusEffect(
     useCallback(() => {
       loadData();
     }, [loadData])
   );
+
+  // Vérifier l'onboarding après que le profil soit chargé
+  useEffect(() => {
+    if (profile) {
+      checkFirstVisit();
+    }
+  }, [profile]);
 
   // Fonctions d'extraction et de nettoyage (copiées depuis le chat)
   const extractMealTitle = (content: string): string => {
@@ -2464,6 +2513,12 @@ export default function Dashboard() {
         onClose={() => setShowDayDetail(false)}
         dayData={selectedDayData}
         date={selectedDate}
+      />
+
+      {/* Modal d'onboarding */}
+      <OnboardingModal
+        visible={showOnboarding}
+        onClose={handleOnboardingClose}
       />
 
     </ScrollView>
