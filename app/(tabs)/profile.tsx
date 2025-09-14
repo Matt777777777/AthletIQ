@@ -1885,28 +1885,34 @@ export default function Profile() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowAccountModal(false)}
       >
-        <View style={{ flex: 1, backgroundColor: "#000" }}>
+        <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
           {/* Header de la modal */}
           <View style={{
             flexDirection: "row",
             justifyContent: "space-between",
             alignItems: "center",
             paddingTop: 60,
-            paddingHorizontal: 20,
-            paddingBottom: 20,
-            backgroundColor: "#111",
+            paddingHorizontal: theme.spacing.lg,
+            paddingBottom: theme.spacing.lg,
+            backgroundColor: theme.colors.surface,
             borderBottomWidth: 1,
-            borderBottomColor: "#333"
+            borderBottomColor: theme.colors.border
           }}>
             <Pressable
               onPress={() => setShowAccountModal(false)}
               style={{
-                padding: 8,
+                padding: theme.spacing.sm,
               }}
             >
-              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "600" }}>←</Text>
+              <Text style={{ 
+                color: theme.colors.text, 
+                ...theme.typography.h4 
+              }}>←</Text>
             </Pressable>
-            <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700" }}>
+            <Text style={{ 
+              color: theme.colors.text, 
+              ...theme.typography.h4 
+            }}>
               Mon compte
             </Text>
             <View style={{ width: 34 }} />
@@ -1915,26 +1921,25 @@ export default function Profile() {
           <ScrollView style={{ flex: 1 }}>
             {/* Section Profil */}
             <View style={{
-              backgroundColor: "#111",
-              marginTop: 20,
-              marginHorizontal: 16,
-              borderRadius: 12,
-              padding: 20,
-              marginBottom: 16,
-              borderWidth: 1,
-              borderColor: "#333"
+              ...theme.card,
+              marginTop: theme.spacing.lg,
+              marginHorizontal: theme.spacing.md,
+              marginBottom: theme.spacing.md,
             }}>
-              <View style={{ alignItems: "center", marginBottom: 16 }}>
+              <View style={{ 
+                alignItems: "center", 
+                marginBottom: theme.spacing.md 
+              }}>
                 <View style={{
                   width: 80,
                   height: 80,
                   borderRadius: 40,
-                  backgroundColor: "#0070F3",
+                  backgroundColor: theme.colors.primary,
                   justifyContent: "center",
                   alignItems: "center",
-                  marginBottom: 12,
+                  marginBottom: theme.spacing.sm,
                   borderWidth: 3,
-                  borderColor: "#333",
+                  borderColor: theme.colors.border,
                   overflow: "hidden",
                 }}>
                   {profileImage || profile?.profileImage ? (
@@ -1948,24 +1953,33 @@ export default function Profile() {
                       resizeMode="cover"
                     />
                   ) : (
-                    <Text style={{ color: "#fff", fontSize: 32, fontWeight: "800" }}>👨‍💼</Text>
+                    <Text style={{ 
+                      color: theme.colors.text, 
+                      fontSize: 32, 
+                      fontWeight: "800" 
+                    }}>👨‍💼</Text>
                   )}
                 </View>
-                <Text style={{ color: "#fff", fontSize: 20, fontWeight: "700", marginBottom: 4 }}>
+                <Text style={{ 
+                  color: theme.colors.text, 
+                  ...theme.typography.h3, 
+                  marginBottom: theme.spacing.xs 
+                }}>
                   {profile?.first_name || "Utilisateur"}
                 </Text>
                 <Pressable
                   onPress={handleSelectProfileImage}
                   style={{
-                    backgroundColor: "#1a1a1a",
-                    paddingHorizontal: 16,
-                    paddingVertical: 8,
+                    ...theme.button.secondary,
+                    paddingHorizontal: theme.spacing.md,
+                    paddingVertical: theme.spacing.xs,
                     borderRadius: 20,
-                    borderWidth: 1,
-                    borderColor: "#0070F3",
                   }}
                 >
-                  <Text style={{ color: "#0070F3", fontSize: 14, fontWeight: "600" }}>
+                  <Text style={{ 
+                    color: theme.colors.primary, 
+                    ...theme.typography.caption 
+                  }}>
                     Modifier la photo
                   </Text>
                 </Pressable>
@@ -1974,43 +1988,53 @@ export default function Profile() {
 
             {/* Section Informations de compte */}
             <View style={{
-              backgroundColor: "#111",
-              marginHorizontal: 16,
-              borderRadius: 12,
-              marginBottom: 16,
-              borderWidth: 1,
-              borderColor: "#333"
+              ...theme.card,
+              marginHorizontal: theme.spacing.md,
+              marginBottom: theme.spacing.md,
             }}>
               <Pressable
                 onPress={() => setShowAccountInfoModal(true)}
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  padding: 16,
+                  padding: theme.spacing.md,
                   borderBottomWidth: 1,
-                  borderBottomColor: "#333",
+                  borderBottomColor: theme.colors.border,
                 }}
               >
                 <View style={{
                   width: 40,
                   height: 40,
                   borderRadius: 20,
-                  backgroundColor: "#1a1a1a",
+                  backgroundColor: theme.colors.surface,
                   justifyContent: "center",
                   alignItems: "center",
-                  marginRight: 12,
+                  marginRight: theme.spacing.sm,
                 }}>
-                  <Text style={{ color: "#60A5FA", fontSize: 18 }}>👤</Text>
+                  <Text style={{ 
+                    color: theme.colors.primary, 
+                    fontSize: 18 
+                  }}>👤</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600" }}>
+                  <Text style={{ 
+                    color: theme.colors.text, 
+                    ...theme.typography.body 
+                  }}>
                     Informations de compte
                   </Text>
-                  <Text style={{ color: "#aaa", fontSize: 14, marginTop: 2 }}>
+                  <Text style={{ 
+                    color: theme.colors.textSecondary, 
+                    ...theme.typography.caption, 
+                    marginTop: theme.spacing.xs 
+                  }}>
                     {userEmail || "Chargement..."}
                   </Text>
                 </View>
-                <Text style={{ color: "#aaa", fontSize: 18 }}>›</Text>
+                <Text style={{ 
+                  color: theme.colors.textSecondary, 
+                  fontSize: 18 
+                }}>›</Text>
               </Pressable>
 
               <Pressable
@@ -2018,220 +2042,270 @@ export default function Profile() {
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  padding: 16,
+                  padding: theme.spacing.md,
                   borderBottomWidth: 1,
-                  borderBottomColor: "#333",
+                  borderBottomColor: theme.colors.border,
                 }}
               >
                 <View style={{
                   width: 40,
                   height: 40,
                   borderRadius: 20,
-                  backgroundColor: "#1a1a1a",
+                  backgroundColor: theme.colors.surface,
                   justifyContent: "center",
                   alignItems: "center",
-                  marginRight: 12,
+                  marginRight: theme.spacing.sm,
                 }}>
-                  <Text style={{ color: "#60A5FA", fontSize: 18 }}>🔐</Text>
+                  <Text style={{ 
+                    color: theme.colors.primary, 
+                    fontSize: 18 
+                  }}>🔐</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600" }}>
+                  <Text style={{ 
+                    color: theme.colors.text, 
+                    ...theme.typography.body 
+                  }}>
                     Connexion et sécurité
                   </Text>
-                  <Text style={{ color: "#aaa", fontSize: 14, marginTop: 2 }}>
+                  <Text style={{ 
+                    color: theme.colors.textSecondary, 
+                    ...theme.typography.caption, 
+                    marginTop: theme.spacing.xs 
+                  }}>
                     Mot de passe et authentification
                   </Text>
                 </View>
-                <Text style={{ color: "#aaa", fontSize: 18 }}>›</Text>
+                <Text style={{ 
+                  color: theme.colors.textSecondary, 
+                  fontSize: 18 
+                }}>›</Text>
               </Pressable>
 
               <Pressable
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  padding: 16,
+                  padding: theme.spacing.md,
                   borderBottomWidth: 1,
-                  borderBottomColor: "#333",
+                  borderBottomColor: theme.colors.border,
                 }}
               >
                 <View style={{
                   width: 40,
                   height: 40,
                   borderRadius: 20,
-                  backgroundColor: "#1a1a1a",
+                  backgroundColor: theme.colors.surface,
                   justifyContent: "center",
                   alignItems: "center",
-                  marginRight: 12,
+                  marginRight: theme.spacing.sm,
                 }}>
-                  <Text style={{ color: "#60A5FA", fontSize: 18 }}>🔒</Text>
+                  <Text style={{ 
+                    color: theme.colors.primary, 
+                    fontSize: 18 
+                  }}>🔒</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600" }}>
+                  <Text style={{ 
+                    color: theme.colors.text, 
+                    ...theme.typography.body 
+                  }}>
                     Données et confidentialité
                   </Text>
-                  <Text style={{ color: "#aaa", fontSize: 14, marginTop: 2 }}>
+                  <Text style={{ 
+                    color: theme.colors.textSecondary, 
+                    ...theme.typography.caption, 
+                    marginTop: theme.spacing.xs 
+                  }}>
                     Gérer vos données personnelles
                   </Text>
                 </View>
-                <Text style={{ color: "#aaa", fontSize: 18 }}>›</Text>
+                <Text style={{ 
+                  color: theme.colors.textSecondary, 
+                  fontSize: 18 
+                }}>›</Text>
               </Pressable>
 
               <Pressable
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  padding: 16,
+                  padding: theme.spacing.md,
                 }}
               >
                 <View style={{
                   width: 40,
                   height: 40,
                   borderRadius: 20,
-                  backgroundColor: "#1a1a1a",
+                  backgroundColor: theme.colors.surface,
                   justifyContent: "center",
                   alignItems: "center",
-                  marginRight: 12,
+                  marginRight: theme.spacing.sm,
                 }}>
-                  <Text style={{ color: "#60A5FA", fontSize: 18 }}>🔔</Text>
+                  <Text style={{ 
+                    color: theme.colors.primary, 
+                    fontSize: 18 
+                  }}>🔔</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600" }}>
+                  <Text style={{ 
+                    color: theme.colors.text, 
+                    ...theme.typography.body 
+                  }}>
                     Préférences de notification
                   </Text>
-                  <Text style={{ color: "#aaa", fontSize: 14, marginTop: 2 }}>
+                  <Text style={{ 
+                    color: theme.colors.textSecondary, 
+                    ...theme.typography.caption, 
+                    marginTop: theme.spacing.xs 
+                  }}>
                     Personnaliser vos notifications
                   </Text>
                 </View>
-                <Text style={{ color: "#aaa", fontSize: 18 }}>›</Text>
+                <Text style={{ 
+                  color: theme.colors.textSecondary, 
+                  fontSize: 18 
+                }}>›</Text>
               </Pressable>
             </View>
 
             {/* Section Aide */}
             <View style={{
-              backgroundColor: "#111",
-              marginHorizontal: 16,
-              borderRadius: 12,
-              marginBottom: 16,
-              borderWidth: 1,
-              borderColor: "#333"
+              ...theme.card,
+              marginHorizontal: theme.spacing.md,
+              marginBottom: theme.spacing.md,
             }}>
               <Pressable
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  padding: 16,
+                  padding: theme.spacing.md,
                 }}
               >
                 <View style={{
                   width: 40,
                   height: 40,
                   borderRadius: 20,
-                  backgroundColor: "#1a1a1a",
+                  backgroundColor: theme.colors.surface,
                   justifyContent: "center",
                   alignItems: "center",
-                  marginRight: 12,
+                  marginRight: theme.spacing.sm,
                 }}>
-                  <Text style={{ color: "#60A5FA", fontSize: 18 }}>💬</Text>
+                  <Text style={{ 
+                    color: theme.colors.primary, 
+                    fontSize: 18 
+                  }}>💬</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600" }}>
+                  <Text style={{ 
+                    color: theme.colors.text, 
+                    ...theme.typography.body 
+                  }}>
                     Aide
                   </Text>
-                  <Text style={{ color: "#aaa", fontSize: 14, marginTop: 2 }}>
+                  <Text style={{ 
+                    color: theme.colors.textSecondary, 
+                    ...theme.typography.caption, 
+                    marginTop: theme.spacing.xs 
+                  }}>
                     Support et FAQ
                   </Text>
                 </View>
-                <Text style={{ color: "#aaa", fontSize: 18 }}>›</Text>
+                <Text style={{ 
+                  color: theme.colors.textSecondary, 
+                  fontSize: 18 
+                }}>›</Text>
               </Pressable>
             </View>
 
             {/* Formulaire de changement de mot de passe */}
             {showChangePassword && (
               <View style={{
-                backgroundColor: "#111",
-                marginHorizontal: 16,
-                borderRadius: 12,
-                marginBottom: 16,
-                padding: 20,
-                borderWidth: 1,
-                borderColor: "#333"
+                ...theme.card,
+                marginHorizontal: theme.spacing.md,
+                marginBottom: theme.spacing.md,
               }}>
-                <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700", marginBottom: 16 }}>
+                <Text style={{ 
+                  color: theme.colors.text, 
+                  ...theme.typography.h4, 
+                  marginBottom: theme.spacing.md 
+                }}>
                   Changer le mot de passe
                 </Text>
                 
-                <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>
+                <Text style={{ 
+                  color: theme.colors.textSecondary, 
+                  ...theme.typography.caption, 
+                  marginBottom: theme.spacing.xs 
+                }}>
                   Mot de passe actuel
                 </Text>
                 <TextInput
                   style={{
-                    backgroundColor: "#1a1a1a",
-                    color: "#fff",
-                    padding: 12,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: "#333",
-                    marginBottom: 16
+                    ...theme.input,
+                    marginBottom: theme.spacing.md
                   }}
                   value={currentPassword}
                   onChangeText={setCurrentPassword}
                   placeholder="Mot de passe actuel"
                   secureTextEntry
-                  placeholderTextColor="#666"
+                  placeholderTextColor={theme.colors.textTertiary}
                 />
 
-                <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>
+                <Text style={{ 
+                  color: theme.colors.textSecondary, 
+                  ...theme.typography.caption, 
+                  marginBottom: theme.spacing.xs 
+                }}>
                   Nouveau mot de passe
                 </Text>
                 <TextInput
                   style={{
-                    backgroundColor: "#1a1a1a",
-                    color: "#fff",
-                    padding: 12,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: "#333",
-                    marginBottom: 16
+                    ...theme.input,
+                    marginBottom: theme.spacing.md
                   }}
                   value={newPassword}
                   onChangeText={setNewPassword}
                   placeholder="Nouveau mot de passe"
                   secureTextEntry
-                  placeholderTextColor="#666"
+                  placeholderTextColor={theme.colors.textTertiary}
                 />
 
-                <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>
+                <Text style={{ 
+                  color: theme.colors.textSecondary, 
+                  ...theme.typography.caption, 
+                  marginBottom: theme.spacing.xs 
+                }}>
                   Confirmer le nouveau mot de passe
                 </Text>
                 <TextInput
                   style={{
-                    backgroundColor: "#1a1a1a",
-                    color: "#fff",
-                    padding: 12,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: "#333",
-                    marginBottom: 20
+                    ...theme.input,
+                    marginBottom: theme.spacing.lg
                   }}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   placeholder="Confirmer le nouveau mot de passe"
                   secureTextEntry
-                  placeholderTextColor="#666"
+                  placeholderTextColor={theme.colors.textTertiary}
                 />
 
-                <View style={{ flexDirection: "row", gap: 12 }}>
+                <View style={{ 
+                  flexDirection: "row", 
+                  gap: theme.spacing.sm 
+                }}>
                   <Pressable
                     onPress={handleChangePassword}
                     style={{
-                      backgroundColor: "#0070F3",
-                      paddingHorizontal: 16,
-                      paddingVertical: 12,
-                      borderRadius: 8,
+                      ...theme.button.primary,
                       flex: 1
                     }}
                   >
-                    <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600", textAlign: "center" }}>
+                    <Text style={{ 
+                      color: theme.colors.text, 
+                      ...theme.typography.button, 
+                      textAlign: "center" 
+                    }}>
                       Modifier
                     </Text>
                   </Pressable>
@@ -2243,14 +2317,15 @@ export default function Profile() {
                       setConfirmPassword('');
                     }}
                     style={{
-                      backgroundColor: "#333",
-                      paddingHorizontal: 16,
-                      paddingVertical: 12,
-                      borderRadius: 8,
+                      ...theme.button.secondary,
                       flex: 1
                     }}
                   >
-                    <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600", textAlign: "center" }}>
+                    <Text style={{ 
+                      color: theme.colors.primary, 
+                      ...theme.typography.button, 
+                      textAlign: "center" 
+                    }}>
                       Annuler
                     </Text>
                   </Pressable>
@@ -2260,21 +2335,18 @@ export default function Profile() {
 
             {/* Section Actions du compte */}
             <View style={{
-              backgroundColor: "#111",
-              marginHorizontal: 16,
-              borderRadius: 12,
-              marginBottom: 20,
-              borderWidth: 1,
-              borderColor: "#333"
+              ...theme.card,
+              marginHorizontal: theme.spacing.md,
+              marginBottom: theme.spacing.lg,
             }}>
               <Pressable
                 onPress={handleDeleteAccount}
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  padding: 16,
+                  padding: theme.spacing.md,
                   borderBottomWidth: 1,
-                  borderBottomColor: "#333",
+                  borderBottomColor: theme.colors.border,
                 }}
               >
                 <View style={{
@@ -2284,19 +2356,29 @@ export default function Profile() {
                   backgroundColor: "#2a1a1a",
                   justifyContent: "center",
                   alignItems: "center",
-                  marginRight: 12,
+                  marginRight: theme.spacing.sm,
                 }}>
                   <Text style={{ color: "#ff4444", fontSize: 18 }}>🗑️</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: "#ff4444", fontSize: 16, fontWeight: "600" }}>
+                  <Text style={{ 
+                    color: "#ff4444", 
+                    ...theme.typography.body 
+                  }}>
                     Fermer le compte
                   </Text>
-                  <Text style={{ color: "#aaa", fontSize: 14, marginTop: 2 }}>
+                  <Text style={{ 
+                    color: theme.colors.textSecondary, 
+                    ...theme.typography.caption, 
+                    marginTop: theme.spacing.xs 
+                  }}>
                     Supprimer définitivement votre compte
                   </Text>
                 </View>
-                <Text style={{ color: "#aaa", fontSize: 18 }}>›</Text>
+                <Text style={{ 
+                  color: theme.colors.textSecondary, 
+                  fontSize: 18 
+                }}>›</Text>
               </Pressable>
 
               <Pressable
@@ -2304,7 +2386,7 @@ export default function Profile() {
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  padding: 16,
+                  padding: theme.spacing.md,
                 }}
               >
                 <View style={{
@@ -2314,19 +2396,29 @@ export default function Profile() {
                   backgroundColor: "#2a1a1a",
                   justifyContent: "center",
                   alignItems: "center",
-                  marginRight: 12,
+                  marginRight: theme.spacing.sm,
                 }}>
                   <Text style={{ color: "#ff6b6b", fontSize: 18 }}>↗️</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: "#ff6b6b", fontSize: 16, fontWeight: "600" }}>
+                  <Text style={{ 
+                    color: "#ff6b6b", 
+                    ...theme.typography.body 
+                  }}>
                     Déconnexion
                   </Text>
-                  <Text style={{ color: "#aaa", fontSize: 14, marginTop: 2 }}>
+                  <Text style={{ 
+                    color: theme.colors.textSecondary, 
+                    ...theme.typography.caption, 
+                    marginTop: theme.spacing.xs 
+                  }}>
                     Se déconnecter de votre compte
                   </Text>
                 </View>
-                <Text style={{ color: "#aaa", fontSize: 18 }}>›</Text>
+                <Text style={{ 
+                  color: theme.colors.textSecondary, 
+                  fontSize: 18 
+                }}>›</Text>
               </Pressable>
             </View>
           </ScrollView>
