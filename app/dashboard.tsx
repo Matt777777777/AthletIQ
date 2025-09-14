@@ -12,6 +12,7 @@ import { latestByType, SavedPlan } from "../lib/plans";
 import { loadDailyHistory, loadProfile, saveDailyHistory, saveDailyMeal, saveProfile, UserProfile } from "../lib/profile";
 import { checkAndResetIfNewDay, checkHealthPermissions, DailySteps, getDailyStepsTarget, getStepsFromSensor, saveDailySteps } from "../lib/steps";
 import { calculateWorkoutCalories } from "../lib/workout-calories";
+import { theme } from "../theme";
 
 
 export default function Dashboard() {
@@ -1242,71 +1243,94 @@ export default function Dashboard() {
 
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: "#000" }} contentContainerStyle={{ paddingTop: 60, paddingHorizontal: 16, paddingBottom: 20 }}>
-      {/* Header avec logo */}
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <Text style={{ color: "#fff", fontSize: 24, fontWeight: "800" }}>
-          Salut Matteo
-      </Text>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Pressable
-            onPress={() => setShowCalendar(true)}
-            style={{
-              backgroundColor: "#0070F3",
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-              borderRadius: 8,
-              alignItems: "center",
-              justifyContent: "center",
-              minWidth: 40,
-              minHeight: 40,
-            }}
-          >
+    <ScrollView 
+      style={{ flex: 1, backgroundColor: theme.colors.background }} 
+      contentContainerStyle={{ 
+        paddingTop: 60, 
+        paddingHorizontal: theme.spacing.lg, 
+        paddingBottom: theme.spacing.xl 
+      }}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Header avec salutation élégante */}
+      <View style={{ 
+        flexDirection: "row", 
+        justifyContent: "space-between", 
+        alignItems: "center", 
+        marginBottom: theme.spacing.xxxl 
+      }}>
+        <View>
+          <Text style={{ 
+            color: theme.colors.text, 
+            ...theme.typography.h2,
+            marginBottom: 4
+          }}>
+            Bonjour
+          </Text>
+          <Text style={{ 
+            color: theme.colors.textSecondary, 
+            ...theme.typography.bodySmall
+          }}>
+            {profile?.first_name || "Utilisateur"}
+          </Text>
+        </View>
+        
+        <Pressable
+          onPress={() => setShowCalendar(true)}
+          style={{
+            ...theme.button.minimal,
+            backgroundColor: theme.colors.surfaceElevated,
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+            paddingHorizontal: theme.spacing.md,
+            paddingVertical: theme.spacing.sm,
+          }}
+        >
           <View style={{ alignItems: "center", justifyContent: "center" }}>
-            {/* Icône de calendrier stylisée */}
+            {/* Icône de calendrier minimaliste */}
             <View style={{
-              width: 20,
-              height: 18,
+              width: 18,
+              height: 16,
               backgroundColor: "transparent",
               borderWidth: 1.5,
-              borderColor: "#fff",
-              borderRadius: 2,
+              borderColor: theme.colors.textSecondary,
+              borderRadius: 3,
               position: "relative",
             }}>
               {/* Anneaux de suspension */}
               <View style={{
                 position: "absolute",
-                top: -4,
-                left: 3,
-                width: 3,
-                height: 3,
-                borderRadius: 1.5,
-                backgroundColor: "#fff",
+                top: -3,
+                left: 2,
+                width: 2,
+                height: 2,
+                borderRadius: 1,
+                backgroundColor: theme.colors.textSecondary,
               }} />
               <View style={{
                 position: "absolute",
-                top: -4,
-                right: 3,
-                width: 3,
-                height: 3,
-                borderRadius: 1.5,
-                backgroundColor: "#fff",
+                top: -3,
+                right: 2,
+                width: 2,
+                height: 2,
+                borderRadius: 1,
+                backgroundColor: theme.colors.textSecondary,
               }} />
               
               {/* Grille des jours */}
               <View style={{
                 flexDirection: "row",
                 flexWrap: "wrap",
-                padding: 2,
-                gap: 1,
+                padding: 1.5,
+                gap: 0.5,
               }}>
                 {Array.from({ length: 6 }, (_, i) => (
                   <View
                     key={i}
                     style={{
-                      width: 2,
-                      height: 2,
-                      backgroundColor: "#fff",
+                      width: 1.5,
+                      height: 1.5,
+                      backgroundColor: theme.colors.textSecondary,
                       borderRadius: 0.5,
                     }}
                   />
@@ -1315,130 +1339,186 @@ export default function Dashboard() {
             </View>
           </View>
         </Pressable>
-        
-        </View>
       </View>
 
-      {/* Section Nutrition et Pas - 3/4 et 1/4 */}
-      <View style={{ flexDirection: "row", gap: 12, marginBottom: 16 }}>
-        {/* Barre de progression des calories - 3/4 de la largeur */}
-        <View
-          style={{
-            flex: 3,
-            backgroundColor: "#111",
-            borderColor: "#1d1d1d",
-            borderWidth: 1,
-            borderRadius: 16,
-            padding: 16,
-          }}
-        >
-          <Text style={{ color: "#fff", fontWeight: "800", fontSize: 16, marginBottom: 8 }}>
-            NUTRITION DU JOUR
-      </Text>
+      {/* Section Nutrition et Pas - Design Apple */}
+      <View style={{ 
+        flexDirection: "row", 
+        gap: theme.spacing.md, 
+        marginBottom: theme.spacing.lg 
+      }}>
+        {/* Carte Nutrition - 3/4 de la largeur */}
+        <View style={{
+          ...theme.card,
+          flex: 3,
+          padding: theme.spacing.lg,
+        }}>
+          <Text style={{ 
+            color: theme.colors.text, 
+            ...theme.typography.h4,
+            marginBottom: theme.spacing.md,
+            letterSpacing: 0.5
+          }}>
+            Nutrition
+          </Text>
 
-          {/* Affichage des calories */}
-          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
-            <Text style={{ color: "#0070F3", fontWeight: "700", fontSize: 14 }}>
-              {kcalConsumed} kcal
+          {/* Affichage des calories avec design épuré */}
+          <View style={{ 
+            flexDirection: "row", 
+            justifyContent: "space-between", 
+            alignItems: "baseline",
+            marginBottom: theme.spacing.sm 
+          }}>
+            <Text style={{ 
+              color: theme.colors.primary, 
+              ...theme.typography.h3,
+              fontWeight: '700'
+            }}>
+              {kcalConsumed}
             </Text>
-            <Text style={{ color: "#aaa", fontSize: 14 }}>
+            <Text style={{ 
+              color: theme.colors.textSecondary, 
+              ...theme.typography.bodySmall
+            }}>
               / {kcalTarget} kcal
             </Text>
           </View>
 
-          {/* Barre de progression */}
-          <View
-            style={{
-              backgroundColor: "#2a2a2a",
-              height: 6,
-              borderRadius: 3,
-              marginBottom: 8,
-              overflow: "hidden",
-            }}
-          >
-            <View
-              style={{
-                backgroundColor: kcalProgressPercentage >= 100 ? "#FF6B35" : "#0070F3",
-                height: "100%",
-                width: `${kcalProgressPercentage}%`,
-                borderRadius: 3,
-              }}
-            />
+          {/* Barre de progression élégante */}
+          <View style={{
+            backgroundColor: theme.colors.surfaceElevated,
+            height: 8,
+            borderRadius: theme.borderRadius.full,
+            marginBottom: theme.spacing.lg,
+            overflow: "hidden",
+          }}>
+            <View style={{
+              backgroundColor: kcalProgressPercentage >= 100 ? theme.colors.warning : theme.colors.primary,
+              height: "100%",
+              width: `${Math.min(kcalProgressPercentage, 100)}%`,
+              borderRadius: theme.borderRadius.full,
+            }} />
           </View>
 
 
 
-          {/* Section Macronutriments */}
-          <View style={{ marginTop: 16, flexDirection: "row", alignItems: "center" }}>
-            {/* Cercle Glucides */}
-            <View style={{ alignItems: "center", marginRight: 16 }}>
+          {/* Section Macronutriments - Design minimaliste */}
+          <View style={{ 
+            flexDirection: "row", 
+            justifyContent: "space-between",
+            alignItems: "center" 
+          }}>
+            {/* Glucides */}
+            <View style={{ alignItems: "center", flex: 1 }}>
               <View style={{
-                width: 60,
-                height: 60,
-                borderRadius: 30,
-                borderWidth: 3,
-                borderColor: "#2a2a2a",
+                width: 50,
+                height: 50,
+                borderRadius: 25,
+                borderWidth: 2,
+                borderColor: theme.colors.border,
+                backgroundColor: theme.colors.surfaceElevated,
                 justifyContent: "center",
                 alignItems: "center",
-                marginBottom: 4,
+                marginBottom: theme.spacing.xs,
               }}>
-                <Text style={{ color: "#ff6b9d", fontSize: 12, fontWeight: "700" }}>
+                <Text style={{ 
+                  color: theme.colors.carbs, 
+                  ...theme.typography.caption,
+                  fontWeight: '700'
+                }}>
                   {Math.round(carbsProgress)}%
                 </Text>
               </View>
-              <Text style={{ color: "#ff6b9d", fontSize: 10, fontWeight: "600", marginBottom: 2 }}>
+              <Text style={{ 
+                color: theme.colors.carbs, 
+                ...theme.typography.caption,
+                fontWeight: '600',
+                marginBottom: 2
+              }}>
                 Glucides
               </Text>
-              <Text style={{ color: "#ff6b9d", fontSize: 9 }}>
-                {carbsTarget - macronutrients.carbs}g restants
+              <Text style={{ 
+                color: theme.colors.textTertiary, 
+                fontSize: 10,
+                textAlign: 'center'
+              }}>
+                {Math.max(0, carbsTarget - macronutrients.carbs)}g restants
               </Text>
             </View>
 
-            {/* Cercle Protéines */}
-            <View style={{ alignItems: "center", marginRight: 16 }}>
+            {/* Protéines */}
+            <View style={{ alignItems: "center", flex: 1 }}>
               <View style={{
-                width: 60,
-                height: 60,
-                borderRadius: 30,
-                borderWidth: 3,
-                borderColor: "#2a2a2a",
+                width: 50,
+                height: 50,
+                borderRadius: 25,
+                borderWidth: 2,
+                borderColor: theme.colors.border,
+                backgroundColor: theme.colors.surfaceElevated,
                 justifyContent: "center",
                 alignItems: "center",
-                marginBottom: 4,
+                marginBottom: theme.spacing.xs,
               }}>
-                <Text style={{ color: "#4dabf7", fontSize: 12, fontWeight: "700" }}>
+                <Text style={{ 
+                  color: theme.colors.protein, 
+                  ...theme.typography.caption,
+                  fontWeight: '700'
+                }}>
                   {Math.round(proteinProgress)}%
                 </Text>
               </View>
-              <Text style={{ color: "#4dabf7", fontSize: 10, fontWeight: "600", marginBottom: 2 }}>
-                Protéine
+              <Text style={{ 
+                color: theme.colors.protein, 
+                ...theme.typography.caption,
+                fontWeight: '600',
+                marginBottom: 2
+              }}>
+                Protéines
               </Text>
-              <Text style={{ color: "#4dabf7", fontSize: 9 }}>
-                {proteinTarget - macronutrients.protein}g restants
+              <Text style={{ 
+                color: theme.colors.textTertiary, 
+                fontSize: 10,
+                textAlign: 'center'
+              }}>
+                {Math.max(0, proteinTarget - macronutrients.protein)}g restants
               </Text>
             </View>
 
-            {/* Cercle Graisses */}
-            <View style={{ alignItems: "center" }}>
+            {/* Graisses */}
+            <View style={{ alignItems: "center", flex: 1 }}>
               <View style={{
-                width: 60,
-                height: 60,
-                borderRadius: 30,
-                borderWidth: 3,
-                borderColor: "#2a2a2a",
+                width: 50,
+                height: 50,
+                borderRadius: 25,
+                borderWidth: 2,
+                borderColor: theme.colors.border,
+                backgroundColor: theme.colors.surfaceElevated,
                 justifyContent: "center",
                 alignItems: "center",
-                marginBottom: 4,
+                marginBottom: theme.spacing.xs,
               }}>
-                <Text style={{ color: "#ffa94d", fontSize: 12, fontWeight: "700" }}>
+                <Text style={{ 
+                  color: theme.colors.fat, 
+                  ...theme.typography.caption,
+                  fontWeight: '700'
+                }}>
                   {Math.round(fatProgress)}%
                 </Text>
               </View>
-              <Text style={{ color: "#ffa94d", fontSize: 10, fontWeight: "600", marginBottom: 2 }}>
-                Graisse
+              <Text style={{ 
+                color: theme.colors.fat, 
+                ...theme.typography.caption,
+                fontWeight: '600',
+                marginBottom: 2
+              }}>
+                Graisses
               </Text>
-              <Text style={{ color: "#ffa94d", fontSize: 9 }}>
-                {fatTarget - macronutrients.fat}g restants
+              <Text style={{ 
+                color: theme.colors.textTertiary, 
+                fontSize: 10,
+                textAlign: 'center'
+              }}>
+                {Math.max(0, fatTarget - macronutrients.fat)}g restants
               </Text>
             </View>
           </View>
@@ -1446,106 +1526,133 @@ export default function Dashboard() {
 
         </View>
 
-        {/* Cercle de progression des pas - 1/4 de la largeur */}
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "#111",
-            borderColor: "#1d1d1d",
-            borderWidth: 1,
-            borderRadius: 16,
-            padding: 16,
-            alignItems: "center",
-          }}
-        >
-          <Text style={{ color: "#fff", fontWeight: "800", fontSize: 14, marginBottom: 8 }}>
-            PAS
+        {/* Carte des pas - Design minimaliste */}
+        <View style={{
+          ...theme.card,
+          flex: 1,
+          padding: theme.spacing.lg,
+          alignItems: "center",
+          justifyContent: "center",
+        }}>
+          <Text style={{ 
+            color: theme.colors.text, 
+            ...theme.typography.label,
+            marginBottom: theme.spacing.md,
+            letterSpacing: 0.5
+          }}>
+            Pas
           </Text>
           
-          {/* Cercle de progression - Plus gros */}
-          <View style={{ position: "relative", marginBottom: 8 }}>
+          {/* Cercle de progression élégant */}
+          <View style={{ 
+            position: "relative", 
+            marginBottom: theme.spacing.md,
+            alignItems: "center",
+            justifyContent: "center"
+          }}>
             {/* Cercle de fond */}
-            <View
-              style={{
-                width: 100,
-                height: 100,
-                borderRadius: 50,
-                borderWidth: 8,
-                borderColor: "#2a2a2a",
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              {/* Cercle de progression - Version améliorée */}
-              <View
-                style={{
-                  position: "absolute",
-                  width: 100,
-                  height: 100,
-                  borderRadius: 50,
-                  borderWidth: 8,
-                  borderColor: "transparent",
-                  borderTopColor: stepsProgressPercentage >= 100 ? "#0070F3" : "#0070F3",
-                  borderRightColor: stepsProgressPercentage >= 75 ? (stepsProgressPercentage >= 100 ? "#0070F3" : "#0070F3") : "transparent",
-                  borderBottomColor: stepsProgressPercentage >= 50 ? (stepsProgressPercentage >= 100 ? "#0070F3" : "#0070F3") : "transparent",
-                  borderLeftColor: stepsProgressPercentage >= 25 ? (stepsProgressPercentage >= 100 ? "#0070F3" : "#0070F3") : "transparent",
-                  transform: [{ rotate: "-90deg" }],
-                }}
-              />
+            <View style={{
+              width: 80,
+              height: 80,
+              borderRadius: 40,
+              borderWidth: 6,
+              borderColor: theme.colors.border,
+              backgroundColor: theme.colors.surfaceElevated,
+              justifyContent: "center",
+              alignItems: "center",
+            }}>
+              {/* Cercle de progression */}
+              <View style={{
+                position: "absolute",
+                width: 80,
+                height: 80,
+                borderRadius: 40,
+                borderWidth: 6,
+                borderColor: "transparent",
+                borderTopColor: stepsProgressPercentage >= 100 ? theme.colors.success : theme.colors.primary,
+                borderRightColor: stepsProgressPercentage >= 75 ? (stepsProgressPercentage >= 100 ? theme.colors.success : theme.colors.primary) : "transparent",
+                borderBottomColor: stepsProgressPercentage >= 50 ? (stepsProgressPercentage >= 100 ? theme.colors.success : theme.colors.primary) : "transparent",
+                borderLeftColor: stepsProgressPercentage >= 25 ? (stepsProgressPercentage >= 100 ? theme.colors.success : theme.colors.primary) : "transparent",
+                transform: [{ rotate: "-90deg" }],
+              }} />
               
               {/* Texte au centre */}
-              <View style={{ alignItems: "center" }}>
-                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 18 }}>
-                  {Math.round(stepsProgressPercentage)}%
-                </Text>
-              </View>
+              <Text style={{ 
+                color: theme.colors.text, 
+                ...theme.typography.h4,
+                fontWeight: '700'
+              }}>
+                {Math.round(stepsProgressPercentage)}%
+              </Text>
             </View>
           </View>
 
           {/* Affichage des pas */}
-          <Text style={{ color: "#0070F3", fontWeight: "700", fontSize: 12, textAlign: "center" }}>
-            {stepsCurrent.toLocaleString()} / 10,000
+          <Text style={{ 
+            color: theme.colors.primary, 
+            ...theme.typography.caption,
+            fontWeight: '600',
+            textAlign: "center"
+          }}>
+            {stepsCurrent.toLocaleString()}
+          </Text>
+          <Text style={{ 
+            color: theme.colors.textTertiary, 
+            fontSize: 10,
+            textAlign: "center",
+            marginTop: 2
+          }}>
+            / 10,000
           </Text>
         </View>
       </View>
 
-      {/* Section Nutrition - Repas de la journée */}
-      <View
-        style={{
-          backgroundColor: "#111",
-          borderColor: "#1d1d1d",
-          borderWidth: 1,
-          borderRadius: 16,
-          padding: 16,
-          marginBottom: 16,
-        }}
-      >
-        <Text style={{ color: "#fff", fontWeight: "800", fontSize: 18, marginBottom: 12 }}>
-          REPAS DU JOUR
+      {/* Section Repas - Design Apple */}
+      <View style={{
+        ...theme.card,
+        marginBottom: theme.spacing.lg,
+      }}>
+        <Text style={{ 
+          color: theme.colors.text, 
+          ...theme.typography.h4,
+          marginBottom: theme.spacing.md,
+          letterSpacing: 0.5
+        }}>
+          Repas du jour
         </Text>
         
-        <View style={{ gap: 12 }}>
+        <View style={{ gap: theme.spacing.md }}>
           {/* Petit-déjeuner */}
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            {/* Case à cocher pour marquer comme mangé */}
+          <View style={{ 
+            flexDirection: "row", 
+            alignItems: "center",
+            paddingVertical: theme.spacing.sm,
+          }}>
+            {/* Case à cocher élégante */}
             <Pressable
               onPress={() => dailyMeals.breakfast && toggleMealEaten('breakfast')}
               disabled={!dailyMeals.breakfast}
               style={{
-                width: 20,
-                height: 20,
-                borderRadius: 4,
+                width: 24,
+                height: 24,
+                borderRadius: 6,
                 borderWidth: 2,
-                borderColor: dailyMeals.breakfast ? (dailyMeals.breakfast.eaten ? "#00D4AA" : "#666") : "#333",
-                backgroundColor: dailyMeals.breakfast?.eaten ? "#00D4AA" : "transparent",
-                marginRight: 12,
+                borderColor: dailyMeals.breakfast ? 
+                  (dailyMeals.breakfast.eaten ? theme.colors.success : theme.colors.border) : 
+                  theme.colors.border,
+                backgroundColor: dailyMeals.breakfast?.eaten ? theme.colors.success : theme.colors.surfaceElevated,
+                marginRight: theme.spacing.md,
                 justifyContent: "center",
                 alignItems: "center",
-                opacity: dailyMeals.breakfast ? 1 : 0.3,
+                opacity: dailyMeals.breakfast ? 1 : 0.4,
               }}
             >
               {dailyMeals.breakfast?.eaten && (
-                <Text style={{ color: "#000", fontSize: 12, fontWeight: "bold" }}>✓</Text>
+                <Text style={{ 
+                  color: theme.colors.background, 
+                  fontSize: 14, 
+                  fontWeight: "700" 
+                }}>✓</Text>
               )}
             </Pressable>
             
@@ -1558,38 +1665,55 @@ export default function Dashboard() {
                 }
               }}
             >
-              <Text style={{ color: "#0070F3", fontSize: 14, fontWeight: "600" }}>Petit-déjeuner</Text>
               <Text style={{ 
-                color: dailyMeals.breakfast ? (dailyMeals.breakfast.eaten ? "#00D4AA" : "#fff") : "#aaa", 
-                fontSize: 12,
+                color: theme.colors.primary, 
+                ...theme.typography.label,
+                marginBottom: 2
+              }}>
+                Petit-déjeuner
+              </Text>
+              <Text style={{ 
+                color: dailyMeals.breakfast ? 
+                  (dailyMeals.breakfast.eaten ? theme.colors.success : theme.colors.text) : 
+                  theme.colors.textTertiary, 
+                ...theme.typography.bodySmall,
                 textDecorationLine: dailyMeals.breakfast?.eaten ? "line-through" : "none"
               }}>
                 {dailyMeals.breakfast ? dailyMeals.breakfast.title : "Pas encore planifié"}
-        </Text>
+              </Text>
             </Pressable>
           </View>
 
           {/* Déjeuner */}
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            {/* Case à cocher pour marquer comme mangé */}
+          <View style={{ 
+            flexDirection: "row", 
+            alignItems: "center",
+            paddingVertical: theme.spacing.sm,
+          }}>
             <Pressable
               onPress={() => dailyMeals.lunch && toggleMealEaten('lunch')}
               disabled={!dailyMeals.lunch}
               style={{
-                width: 20,
-                height: 20,
-                borderRadius: 4,
+                width: 24,
+                height: 24,
+                borderRadius: 6,
                 borderWidth: 2,
-                borderColor: dailyMeals.lunch ? (dailyMeals.lunch.eaten ? "#00D4AA" : "#666") : "#333",
-                backgroundColor: dailyMeals.lunch?.eaten ? "#00D4AA" : "transparent",
-                marginRight: 12,
+                borderColor: dailyMeals.lunch ? 
+                  (dailyMeals.lunch.eaten ? theme.colors.success : theme.colors.border) : 
+                  theme.colors.border,
+                backgroundColor: dailyMeals.lunch?.eaten ? theme.colors.success : theme.colors.surfaceElevated,
+                marginRight: theme.spacing.md,
                 justifyContent: "center",
                 alignItems: "center",
-                opacity: dailyMeals.lunch ? 1 : 0.3,
+                opacity: dailyMeals.lunch ? 1 : 0.4,
               }}
             >
               {dailyMeals.lunch?.eaten && (
-                <Text style={{ color: "#000", fontSize: 12, fontWeight: "bold" }}>✓</Text>
+                <Text style={{ 
+                  color: theme.colors.background, 
+                  fontSize: 14, 
+                  fontWeight: "700" 
+                }}>✓</Text>
               )}
             </Pressable>
             
@@ -1602,42 +1726,59 @@ export default function Dashboard() {
                 }
               }}
             >
-              <Text style={{ color: "#0070F3", fontSize: 14, fontWeight: "600" }}>Déjeuner</Text>
               <Text style={{ 
-                color: dailyMeals.lunch ? (dailyMeals.lunch.eaten ? "#00D4AA" : "#fff") : "#aaa", 
-                fontSize: 12,
+                color: theme.colors.primary, 
+                ...theme.typography.label,
+                marginBottom: 2
+              }}>
+                Déjeuner
+              </Text>
+              <Text style={{ 
+                color: dailyMeals.lunch ? 
+                  (dailyMeals.lunch.eaten ? theme.colors.success : theme.colors.text) : 
+                  theme.colors.textTertiary, 
+                ...theme.typography.bodySmall,
                 textDecorationLine: dailyMeals.lunch?.eaten ? "line-through" : "none"
               }}>
                 {dailyMeals.lunch ? dailyMeals.lunch.title : "Pas encore planifié"}
-          </Text>
+              </Text>
             </Pressable>
           </View>
 
           {/* Collation */}
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            {/* Case à cocher pour marquer comme mangé */}
+          <View style={{ 
+            flexDirection: "row", 
+            alignItems: "center",
+            paddingVertical: theme.spacing.sm,
+          }}>
             <Pressable
               onPress={() => dailyMeals.snack && toggleMealEaten('snack')}
               disabled={!dailyMeals.snack}
               style={{
-                width: 20,
-                height: 20,
-                borderRadius: 4,
+                width: 24,
+                height: 24,
+                borderRadius: 6,
                 borderWidth: 2,
-                borderColor: dailyMeals.snack ? (dailyMeals.snack.eaten ? "#00D4AA" : "#666") : "#333",
-                backgroundColor: dailyMeals.snack?.eaten ? "#00D4AA" : "transparent",
-                marginRight: 12,
+                borderColor: dailyMeals.snack ? 
+                  (dailyMeals.snack.eaten ? theme.colors.success : theme.colors.border) : 
+                  theme.colors.border,
+                backgroundColor: dailyMeals.snack?.eaten ? theme.colors.success : theme.colors.surfaceElevated,
+                marginRight: theme.spacing.md,
                 justifyContent: "center",
                 alignItems: "center",
-                opacity: dailyMeals.snack ? 1 : 0.3,
+                opacity: dailyMeals.snack ? 1 : 0.4,
               }}
             >
               {dailyMeals.snack?.eaten && (
-                <Text style={{ color: "#000", fontSize: 12, fontWeight: "bold" }}>✓</Text>
+                <Text style={{ 
+                  color: theme.colors.background, 
+                  fontSize: 14, 
+                  fontWeight: "700" 
+                }}>✓</Text>
               )}
             </Pressable>
             
-          <Pressable
+            <Pressable
               style={{ flex: 1 }}
               onPress={() => {
                 if (dailyMeals.snack) {
@@ -1646,10 +1787,18 @@ export default function Dashboard() {
                 }
               }}
             >
-              <Text style={{ color: "#0070F3", fontSize: 14, fontWeight: "600" }}>Collation</Text>
               <Text style={{ 
-                color: dailyMeals.snack ? (dailyMeals.snack.eaten ? "#00D4AA" : "#fff") : "#aaa", 
-                fontSize: 12,
+                color: theme.colors.primary, 
+                ...theme.typography.label,
+                marginBottom: 2
+              }}>
+                Collation
+              </Text>
+              <Text style={{ 
+                color: dailyMeals.snack ? 
+                  (dailyMeals.snack.eaten ? theme.colors.success : theme.colors.text) : 
+                  theme.colors.textTertiary, 
+                ...theme.typography.bodySmall,
                 textDecorationLine: dailyMeals.snack?.eaten ? "line-through" : "none"
               }}>
                 {dailyMeals.snack ? dailyMeals.snack.title : "Pas encore planifié"}
@@ -1658,26 +1807,35 @@ export default function Dashboard() {
           </View>
 
           {/* Dîner */}
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            {/* Case à cocher pour marquer comme mangé */}
+          <View style={{ 
+            flexDirection: "row", 
+            alignItems: "center",
+            paddingVertical: theme.spacing.sm,
+          }}>
             <Pressable
               onPress={() => dailyMeals.dinner && toggleMealEaten('dinner')}
               disabled={!dailyMeals.dinner}
-            style={{
-                width: 20,
-                height: 20,
-                borderRadius: 4,
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 6,
                 borderWidth: 2,
-                borderColor: dailyMeals.dinner ? (dailyMeals.dinner.eaten ? "#00D4AA" : "#666") : "#333",
-                backgroundColor: dailyMeals.dinner?.eaten ? "#00D4AA" : "transparent",
-                marginRight: 12,
+                borderColor: dailyMeals.dinner ? 
+                  (dailyMeals.dinner.eaten ? theme.colors.success : theme.colors.border) : 
+                  theme.colors.border,
+                backgroundColor: dailyMeals.dinner?.eaten ? theme.colors.success : theme.colors.surfaceElevated,
+                marginRight: theme.spacing.md,
                 justifyContent: "center",
                 alignItems: "center",
-                opacity: dailyMeals.dinner ? 1 : 0.3,
+                opacity: dailyMeals.dinner ? 1 : 0.4,
               }}
             >
               {dailyMeals.dinner?.eaten && (
-                <Text style={{ color: "#000", fontSize: 12, fontWeight: "bold" }}>✓</Text>
+                <Text style={{ 
+                  color: theme.colors.background, 
+                  fontSize: 14, 
+                  fontWeight: "700" 
+                }}>✓</Text>
               )}
             </Pressable>
             
@@ -1690,10 +1848,18 @@ export default function Dashboard() {
                 }
               }}
             >
-              <Text style={{ color: "#0070F3", fontSize: 14, fontWeight: "600" }}>Dîner</Text>
               <Text style={{ 
-                color: dailyMeals.dinner ? (dailyMeals.dinner.eaten ? "#00D4AA" : "#fff") : "#aaa", 
-                fontSize: 12,
+                color: theme.colors.primary, 
+                ...theme.typography.label,
+                marginBottom: 2
+              }}>
+                Dîner
+              </Text>
+              <Text style={{ 
+                color: dailyMeals.dinner ? 
+                  (dailyMeals.dinner.eaten ? theme.colors.success : theme.colors.text) : 
+                  theme.colors.textTertiary, 
+                ...theme.typography.bodySmall,
                 textDecorationLine: dailyMeals.dinner?.eaten ? "line-through" : "none"
               }}>
                 {dailyMeals.dinner ? dailyMeals.dinner.title : "Pas encore planifié"}
@@ -1702,52 +1868,68 @@ export default function Dashboard() {
           </View>
         </View>
 
-        {/* Bouton d'ajout de repas - rond en bas à droite */}
-        <View style={{ alignItems: "flex-end", marginTop: 16 }}>
+        {/* Bouton d'ajout de repas - Design Apple */}
+        <View style={{ 
+          alignItems: "flex-end", 
+          marginTop: theme.spacing.lg 
+        }}>
           <Pressable
             onPress={handleAddMealClick}
             style={{
-              width: 50,
-              height: 50,
-              borderRadius: 25,
-              backgroundColor: "#0070F3",
-              justifyContent: "center",
-              alignItems: "center",
-              shadowColor: "#0070F3",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.3,
-              shadowRadius: 4,
-              elevation: 5,
+              ...theme.button.primary,
+              width: 48,
+              height: 48,
+              borderRadius: 24,
+              ...theme.shadows.md,
             }}
           >
-            <Text style={{ color: "#fff", fontSize: 24, fontWeight: "bold" }}>+</Text>
+            <Text style={{ 
+              color: theme.colors.text, 
+              fontSize: 20, 
+              fontWeight: "600" 
+            }}>+</Text>
           </Pressable>
         </View>
       </View>
 
-      {/* SPORT - Séance du jour */}
-      <View
-        style={{
-          backgroundColor: "#111",
-          borderColor: "#1d1d1d",
-          borderWidth: 1,
-          borderRadius: 16,
-          padding: 16,
-          marginBottom: 16,
-        }}
-      >
-        <Text style={{ color: "#fff", fontWeight: "800", fontSize: 18, marginBottom: 16 }}>
-          SPORT
+      {/* Section Sport - Design Apple */}
+      <View style={{
+        ...theme.card,
+        marginBottom: theme.spacing.lg,
+      }}>
+        <Text style={{ 
+          color: theme.colors.text, 
+          ...theme.typography.h4,
+          marginBottom: theme.spacing.md,
+          letterSpacing: 0.5
+        }}>
+          Sport
         </Text>
         
-        {/* Calories dépensées */}
-        <View style={{ marginBottom: 16 }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <Text style={{ color: "#0070F3", fontWeight: "700", fontSize: 14 }}>
+        {/* Calories dépensées - Design épuré */}
+        <View style={{ 
+          backgroundColor: theme.colors.surfaceElevated,
+          borderRadius: theme.borderRadius.md,
+          padding: theme.spacing.md,
+          marginBottom: theme.spacing.md,
+        }}>
+          <View style={{ 
+            flexDirection: "row", 
+            justifyContent: "space-between", 
+            alignItems: "center" 
+          }}>
+            <Text style={{ 
+              color: theme.colors.primary, 
+              ...theme.typography.label
+            }}>
               Calories dépensées
             </Text>
-            <Text style={{ color: "#0070F3", fontWeight: "700", fontSize: 14 }}>
-              {Math.round(calculateDailyCaloriesBurned())} kcal
+            <Text style={{ 
+              color: theme.colors.primary, 
+              ...theme.typography.h4,
+              fontWeight: '700'
+            }}>
+              {Math.round(calculateDailyCaloriesBurned())}
             </Text>
           </View>
         </View>
@@ -1755,135 +1937,166 @@ export default function Dashboard() {
         {dailyWorkouts.length > 0 ? (
           <View>
             {dailyWorkouts.filter(workout => workout.title && workout.content && workout.title.trim() !== '' && workout.content.trim() !== '').map((workout, index) => (
-              <View key={workout.id} style={{ marginBottom: 12 }}>
+              <View key={workout.id} style={{ marginBottom: theme.spacing.md }}>
                 <Pressable
                   onPress={() => openWorkoutDetail(workout)}
                   style={{
-                    backgroundColor: "#1a1a1a",
-                    borderColor: workout.completed ? "#22c55e" : "#333",
+                    backgroundColor: theme.colors.surfaceElevated,
+                    borderColor: workout.completed ? theme.colors.success : theme.colors.border,
                     borderWidth: 1,
-                    borderRadius: 12,
-                    padding: 12,
+                    borderRadius: theme.borderRadius.md,
+                    padding: theme.spacing.md,
                   }}
                 >
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <View style={{ 
+                    flexDirection: "row", 
+                    justifyContent: "space-between", 
+                    alignItems: "center" 
+                  }}>
                     <View style={{ flex: 1 }}>
                       <Text style={{ 
-                        color: workout.completed ? "#22c55e" : "#fff", 
-                        fontWeight: "600", 
-                        fontSize: 14,
-                        textDecorationLine: workout.completed ? "line-through" : "none"
+                        color: workout.completed ? theme.colors.success : theme.colors.text, 
+                        ...theme.typography.label,
+                        textDecorationLine: workout.completed ? "line-through" : "none",
+                        marginBottom: 4
                       }}>
                         {workout.title}
-        </Text>
-                      <Text style={{ color: "#888", fontSize: 12, marginTop: 2 }}>
+                      </Text>
+                      <Text style={{ 
+                        color: theme.colors.textTertiary, 
+                        ...theme.typography.caption
+                      }}>
                         {workout.duration} min • {workout.calories} kcal • {workout.sessionType === 'morning' ? 'Matin' : 'Soir'}
-          </Text>
+                      </Text>
                     </View>
                     
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <View style={{ 
+                      flexDirection: "row", 
+                      alignItems: "center", 
+                      gap: theme.spacing.sm 
+                    }}>
                       <Pressable
                         onPress={() => toggleWorkoutCompleted(workout.id)}
                         style={{
-                          width: 24,
-                          height: 24,
-                          borderRadius: 12,
+                          width: 28,
+                          height: 28,
+                          borderRadius: 14,
                           borderWidth: 2,
-                          borderColor: workout.completed ? "#22c55e" : "#555",
-                          backgroundColor: workout.completed ? "#22c55e" : "transparent",
+                          borderColor: workout.completed ? theme.colors.success : theme.colors.border,
+                          backgroundColor: workout.completed ? theme.colors.success : theme.colors.surfaceElevated,
                           justifyContent: "center",
                           alignItems: "center",
                         }}
                       >
                         {workout.completed && (
-                          <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>✓</Text>
+                          <Text style={{ 
+                            color: theme.colors.background, 
+                            fontSize: 14, 
+                            fontWeight: "700" 
+                          }}>✓</Text>
                         )}
                       </Pressable>
                       
-          <Pressable
+                      <Pressable
                         onPress={() => removeWorkout(workout.id)}
-            style={{
-                          width: 24,
-                          height: 24,
-              borderRadius: 12,
-                          backgroundColor: "#ff4444",
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 14,
+                          backgroundColor: theme.colors.error,
                           justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-                        <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>×</Text>
-          </Pressable>
-      </View>
+                          alignItems: "center",
+                        }}
+                      >
+                        <Text style={{ 
+                          color: theme.colors.text, 
+                          fontSize: 14, 
+                          fontWeight: "700" 
+                        }}>×</Text>
+                      </Pressable>
+                    </View>
                   </View>
                 </Pressable>
               </View>
             ))}
 
             <Pressable
-                onPress={() => setShowImportModal(true)}
-            style={{
-                  backgroundColor: "#0070F3",
-                  paddingVertical: 12,
-                  paddingHorizontal: 16,
-              borderRadius: 12,
-              alignItems: "center",
-                  marginTop: 8,
-            }}
-          >
-                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>
-                  Importer une séance enregistrée
-            </Text>
-              </Pressable>
+              onPress={() => setShowImportModal(true)}
+              style={{
+                ...theme.button.secondary,
+                marginTop: theme.spacing.sm,
+              }}
+            >
+              <Text style={{ 
+                color: theme.colors.primary, 
+                ...theme.typography.buttonSmall
+              }}>
+                Importer une séance
+              </Text>
+            </Pressable>
           </View>
         ) : (
-          <View style={{ alignItems: "center", paddingVertical: 20 }}>
-            <Text style={{ color: "#888", fontSize: 16, marginBottom: 16 }}>
+          <View style={{ 
+            alignItems: "center", 
+            paddingVertical: theme.spacing.xl,
+            paddingHorizontal: theme.spacing.lg
+          }}>
+            <Text style={{ 
+              color: theme.colors.textTertiary, 
+              ...theme.typography.body,
+              marginBottom: theme.spacing.lg,
+              textAlign: 'center'
+            }}>
               Aucune séance planifiée
             </Text>
             <Pressable
               onPress={() => setShowImportModal(true)}
               style={{
-                backgroundColor: "#0070F3",
-                paddingVertical: 12,
-                paddingHorizontal: 24,
-                borderRadius: 12,
-                alignItems: "center",
+                ...theme.button.primary,
+                paddingHorizontal: theme.spacing.xl,
               }}
             >
-              <Text style={{ color: "#fff", fontWeight: "700" }}>Importer une séance enregistrée</Text>
-          </Pressable>
+              <Text style={{ 
+                color: theme.colors.text, 
+                ...theme.typography.button
+              }}>
+                Importer une séance
+              </Text>
+            </Pressable>
           </View>
         )}
       </View>
 
-
-      {/* LISTE DE COURSES */}
-      <View
-        style={{
-          backgroundColor: "#111",
-          borderColor: "#1d1d1d",
-          borderWidth: 1,
-          borderRadius: 16,
-          padding: 16,
-          marginTop: 16,
-        }}
-      >
-        <Text style={{ color: "#fff", fontWeight: "800", fontSize: 18, marginBottom: 6 }}>
-          LISTE DE COURSES
+      {/* Liste de courses - Design Apple */}
+      <View style={{
+        ...theme.card,
+        marginTop: theme.spacing.lg,
+      }}>
+        <Text style={{ 
+          color: theme.colors.text, 
+          ...theme.typography.h4,
+          marginBottom: theme.spacing.xs,
+          letterSpacing: 0.5
+        }}>
+          Liste de courses
         </Text>
-        <Text style={{ color: "#ccc", marginBottom: 12 }}>
+        <Text style={{ 
+          color: theme.colors.textSecondary, 
+          ...theme.typography.bodySmall,
+          marginBottom: theme.spacing.md
+        }}>
           Gère tes ingrédients et organise tes courses
         </Text>
         <Link href="/shopping" asChild>
-          <Pressable
-            style={{
-              backgroundColor: "#0070F3",
-              paddingVertical: 12,
-              borderRadius: 12,
-              alignItems: "center",
-            }}
-          >
-            <Text style={{ color: "#fff", fontWeight: "700" }}>Voir ma liste</Text>
+          <Pressable style={{
+            ...theme.button.primary,
+          }}>
+            <Text style={{ 
+              color: theme.colors.text, 
+              ...theme.typography.button
+            }}>
+              Voir ma liste
+            </Text>
           </Pressable>
         </Link>
       </View>
