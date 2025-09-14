@@ -2,9 +2,9 @@
 export const theme = {
   colors: {
     // Couleurs principales
-    primary: '#26619c', // Bleu lapis lazuli
-    primaryLight: '#3a7bc8',
-    primaryDark: '#1e4a73',
+    primary: '#0070F3', // Bleu des boutons du chat
+    primaryLight: '#3B82F6',
+    primaryDark: '#1E40AF',
     
     // Couleurs de fond
     background: '#000000',
@@ -19,7 +19,7 @@ export const theme = {
     textDisabled: '#4d4d4d',
     
     // Couleurs d'accent
-    accent: '#26619c',
+    accent: '#0070F3',
     success: '#00d4aa',
     warning: '#ffa94d',
     error: '#ff4444',
@@ -150,7 +150,7 @@ export const theme = {
   
   button: {
     primary: {
-      backgroundColor: '#26619c',
+      backgroundColor: '#0070F3',
       borderRadius: 12,
       paddingVertical: 12,
       paddingHorizontal: 20,

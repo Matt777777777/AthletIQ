@@ -1,16 +1,18 @@
 // components/DayDetailModal.tsx
 import React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { estimateKcalTarget } from '../lib/nutrition';
 import { UserProfile } from '../lib/profile';
 
 interface DayDetailModalProps {
   visible: boolean;
   onClose: () => void;
-  dayData: NonNullable<UserProfile['dailyHistory']>[string] | null;
+  dayData: any;
   date: string;
+  profile: UserProfile | null;
 }
 
-export default function DayDetailModal({ visible, onClose, dayData, date }: DayDetailModalProps) {
+export default function DayDetailModal({ visible, onClose, dayData, date, profile }: DayDetailModalProps) {
   console.log('🔍 DayDetailModal - visible:', visible, 'date:', date, 'dayData:', dayData);
   console.log('🔍 DayDetailModal - visible type:', typeof visible);
   console.log('🔍 DayDetailModal - dayData type:', typeof dayData);
@@ -29,14 +31,20 @@ export default function DayDetailModal({ visible, onClose, dayData, date }: DayD
   };
   
   const displayData = dayData || defaultData;
+  
+  // Calculer l'objectif de calories basé sur le profil
+  const kcalTarget = profile ? estimateKcalTarget(profile) : 2000;
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('fr-FR', { 
-      weekday: 'long', 
+    const date = new Date(dateString);
+    const weekday = date.toLocaleDateString('fr-FR', { weekday: 'long' });
+    const capitalizedWeekday = weekday.charAt(0).toUpperCase() + weekday.slice(1);
+    const restOfDate = date.toLocaleDateString('fr-FR', { 
       year: 'numeric', 
       month: 'long', 
       day: 'numeric' 
     });
+    return `${capitalizedWeekday} ${restOfDate}`;
   };
 
   const getProgressPercentage = (current: number, target: number) => {
@@ -70,7 +78,7 @@ export default function DayDetailModal({ visible, onClose, dayData, date }: DayD
                 <View style={styles.progressHeader}>
                   <Text style={styles.progressLabel}>Calories</Text>
                   <Text style={styles.progressValue}>
-                    {displayData.nutrition.kcal} / 2000 kcal
+                    {displayData.nutrition.kcal} / {kcalTarget} kcal
                   </Text>
                 </View>
                 <View style={styles.progressBar}>
@@ -78,8 +86,8 @@ export default function DayDetailModal({ visible, onClose, dayData, date }: DayD
                     style={[
                       styles.progressFill,
                       {
-                        width: `${getProgressPercentage(displayData.nutrition.kcal, 2000)}%`,
-                        backgroundColor: getProgressColor(getProgressPercentage(displayData.nutrition.kcal, 2000))
+                        width: `${getProgressPercentage(displayData.nutrition.kcal, kcalTarget)}%`,
+                        backgroundColor: getProgressColor(getProgressPercentage(displayData.nutrition.kcal, kcalTarget))
                       }
                     ]}
                   />

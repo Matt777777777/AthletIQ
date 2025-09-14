@@ -1262,16 +1262,9 @@ export default function Dashboard() {
         <View>
           <Text style={{ 
             color: theme.colors.text, 
-            ...theme.typography.h2,
-            marginBottom: 4
+            ...theme.typography.h2
           }}>
-            Bonjour
-          </Text>
-          <Text style={{ 
-            color: theme.colors.textSecondary, 
-            ...theme.typography.bodySmall
-          }}>
-            {profile?.first_name || "Utilisateur"}
+            Bonjour {profile?.first_name || "Utilisateur"} !
           </Text>
         </View>
         
@@ -1400,16 +1393,14 @@ export default function Dashboard() {
             }} />
           </View>
 
-
-
           {/* Section Macronutriments - Design minimaliste */}
           <View style={{ 
             flexDirection: "row", 
-            justifyContent: "space-between",
-            alignItems: "center" 
+            justifyContent: "space-around",
+            alignItems: "flex-start" 
           }}>
             {/* Glucides */}
-            <View style={{ alignItems: "center", flex: 1 }}>
+            <View style={{ alignItems: "center", flex: 1, minHeight: 80 }}>
               <View style={{
                 width: 50,
                 height: 50,
@@ -1447,7 +1438,7 @@ export default function Dashboard() {
             </View>
 
             {/* Protéines */}
-            <View style={{ alignItems: "center", flex: 1 }}>
+            <View style={{ alignItems: "center", flex: 1, minHeight: 80 }}>
               <View style={{
                 width: 50,
                 height: 50,
@@ -1485,7 +1476,7 @@ export default function Dashboard() {
             </View>
 
             {/* Graisses */}
-            <View style={{ alignItems: "center", flex: 1 }}>
+            <View style={{ alignItems: "center", flex: 1, minHeight: 80 }}>
               <View style={{
                 width: 50,
                 height: 50,
@@ -1868,26 +1859,22 @@ export default function Dashboard() {
           </View>
         </View>
 
-        {/* Bouton d'ajout de repas - Design Apple */}
+        {/* Bouton d'ajout de repas - Style similaire au bouton sport */}
         <View style={{ 
-          alignItems: "flex-end", 
           marginTop: theme.spacing.lg 
         }}>
           <Pressable
             onPress={handleAddMealClick}
             style={{
-              ...theme.button.primary,
-              width: 48,
-              height: 48,
-              borderRadius: 24,
-              ...theme.shadows.md,
+              ...theme.button.secondary,
             }}
           >
             <Text style={{ 
-              color: theme.colors.text, 
-              fontSize: 20, 
-              fontWeight: "600" 
-            }}>+</Text>
+              color: theme.colors.primary, 
+              ...theme.typography.button
+            }}>
+              Ajouter un repas
+            </Text>
           </Pressable>
         </View>
       </View>
@@ -2089,10 +2076,10 @@ export default function Dashboard() {
         </Text>
         <Link href="/shopping" asChild>
           <Pressable style={{
-            ...theme.button.primary,
+            ...theme.button.secondary,
           }}>
             <Text style={{ 
-              color: theme.colors.text, 
+              color: theme.colors.primary, 
               ...theme.typography.button
             }}>
               Voir ma liste
@@ -2120,14 +2107,14 @@ export default function Dashboard() {
             padding: 20,
           }}
         >
-          <View
-            style={{
-              backgroundColor: "#111",
+      <View
+        style={{
+          backgroundColor: "#111",
               borderRadius: 16,
               padding: 20,
               width: "100%",
               maxHeight: "80%",
-              borderWidth: 1,
+          borderWidth: 1,
               borderColor: "#1d1d1d",
             }}
           >
@@ -2184,7 +2171,7 @@ export default function Dashboard() {
           <View
             style={{
               backgroundColor: "#111",
-              borderRadius: 16,
+          borderRadius: 16,
               padding: 20,
               width: "100%",
               maxHeight: "80%",
@@ -2195,7 +2182,7 @@ export default function Dashboard() {
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <Text style={{ color: "#fff", fontSize: 18, fontWeight: "800", flex: 1 }}>
                 Ajouter un repas
-              </Text>
+        </Text>
               <Pressable
                 onPress={() => {
                   setShowAddMealModal(false);
@@ -2216,7 +2203,7 @@ export default function Dashboard() {
 
             <Text style={{ color: "#0070F3", fontSize: 14, fontWeight: "600", marginBottom: 8 }}>
               Nom du plat
-            </Text>
+        </Text>
             <TextInput
               value={manualMealTitle}
               onChangeText={setManualMealTitle}
@@ -2235,7 +2222,7 @@ export default function Dashboard() {
             
             <Text style={{ color: "#0070F3", fontSize: 14, fontWeight: "600", marginBottom: 8 }}>
               Recette
-            </Text>
+          </Text>
             <TextInput
               value={manualMealContent}
               onChangeText={setManualMealContent}
@@ -2276,15 +2263,15 @@ export default function Dashboard() {
                 onPress={handleSaveManualMeal}
                 style={{
                   flex: 1,
-                  backgroundColor: "#0070F3",
-                  paddingVertical: 12,
+              backgroundColor: "#0070F3",
+              paddingVertical: 12,
                   borderRadius: 8,
-                  alignItems: "center",
-                }}
-              >
+              alignItems: "center",
+            }}
+          >
                 <Text style={{ color: "#fff", fontWeight: "600" }}>Enregistrer</Text>
-              </Pressable>
-            </View>
+          </Pressable>
+      </View>
           </View>
         </View>
       </Modal>
@@ -2299,8 +2286,8 @@ export default function Dashboard() {
           setCurrentMealType(null);
         }}
       >
-        <View
-          style={{
+      <View
+        style={{
             flex: 1,
             backgroundColor: "rgba(0, 0, 0, 0.8)",
             justifyContent: "center",
@@ -2311,7 +2298,7 @@ export default function Dashboard() {
           <View
             style={{
               backgroundColor: "#111",
-              borderRadius: 16,
+          borderRadius: 16,
               padding: 20,
               width: "100%",
               maxHeight: "80%",
@@ -2322,7 +2309,7 @@ export default function Dashboard() {
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <Text style={{ color: "#fff", fontSize: 18, fontWeight: "800", flex: 1 }}>
                 Importer un repas
-              </Text>
+        </Text>
               <Pressable
                 onPress={() => {
                   setShowImportMealModal(false);
@@ -2341,7 +2328,7 @@ export default function Dashboard() {
 
             <Text style={{ color: "#ccc", fontSize: 14, marginBottom: 16 }}>
               Choisis un repas depuis tes plans sauvegardés :
-            </Text>
+        </Text>
             
             <ScrollView style={{ maxHeight: 300 }}>
               {savedMeals.length > 0 ? (
@@ -2369,8 +2356,8 @@ export default function Dashboard() {
               ) : (
                 <Text style={{ color: "#666", textAlign: "center", padding: 20 }}>
                   Aucun repas sauvegardé
-                </Text>
-              )}
+          </Text>
+        )}
             </ScrollView>
       </View>
     </View>
@@ -2404,34 +2391,34 @@ export default function Dashboard() {
             </Text>
             
             <View style={{ gap: 12 }}>
-              <Pressable
+          <Pressable
                 onPress={() => handleMealTypeSelect('breakfast')}
-                style={{
+            style={{
                   backgroundColor: "#222",
                   padding: 16,
               borderRadius: 12,
                   borderWidth: 1,
                   borderColor: "#333",
-                }}
-              >
+            }}
+          >
                 <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600", textAlign: "center" }}>
                   Petit-déjeuner
                 </Text>
           </Pressable>
 
-              <Pressable
+          <Pressable
                 onPress={() => handleMealTypeSelect('lunch')}
-                style={{
+            style={{
                   backgroundColor: "#222",
                   padding: 16,
-                  borderRadius: 12,
+              borderRadius: 12,
                   borderWidth: 1,
                   borderColor: "#333",
-                }}
-              >
+            }}
+          >
                 <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600", textAlign: "center" }}>
                   Déjeuner
-                </Text>
+            </Text>
               </Pressable>
 
               <Pressable
@@ -2446,38 +2433,38 @@ export default function Dashboard() {
               >
                 <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600", textAlign: "center" }}>
                   Collation
-                </Text>
-              </Pressable>
+            </Text>
+          </Pressable>
 
-              <Pressable
+          <Pressable
                 onPress={() => handleMealTypeSelect('dinner')}
-                style={{
+            style={{
                   backgroundColor: "#222",
                   padding: 16,
-                  borderRadius: 12,
+              borderRadius: 12,
                   borderWidth: 1,
                   borderColor: "#333",
-                }}
-              >
+            }}
+          >
                 <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600", textAlign: "center" }}>
                   Dîner
                 </Text>
-              </Pressable>
+          </Pressable>
       </View>
 
-            <Pressable
+          <Pressable
               onPress={() => setShowMealTypeSelector(false)}
-              style={{
+            style={{
                 marginTop: 20,
                 padding: 12,
                 backgroundColor: "#333",
                 borderRadius: 8,
               alignItems: "center",
-              }}
-            >
+            }}
+          >
               <Text style={{ color: "#fff", fontWeight: "600" }}>Annuler</Text>
-            </Pressable>
-    </View>
+          </Pressable>
+      </View>
         </View>
       </Modal>
 
@@ -2513,12 +2500,12 @@ export default function Dashboard() {
               <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700" }}>
                 {selectedWorkout?.title}
               </Text>
-              <Pressable
+          <Pressable
                 onPress={() => {
                   setShowWorkoutModal(false);
                   setSelectedWorkout(null);
                 }}
-                style={{
+            style={{
                   backgroundColor: "#333",
                   paddingHorizontal: 12,
                   paddingVertical: 6,
@@ -2605,7 +2592,7 @@ export default function Dashboard() {
             flex: 1,
             backgroundColor: "rgba(0, 0, 0, 0.8)",
             justifyContent: "center",
-            alignItems: "center",
+              alignItems: "center",
             padding: 20,
           }}
         >
@@ -2632,16 +2619,16 @@ export default function Dashboard() {
                 }}
               >
                 <Text style={{ color: "#fff", fontWeight: "600" }}>Fermer</Text>
-              </Pressable>
-            </View>
+          </Pressable>
+      </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
               {savedWorkouts.length > 0 ? (
                 savedWorkouts.map((workout) => (
-                  <Pressable
+          <Pressable
                     key={workout.id}
                     onPress={() => importWorkout(workout)}
-                    style={{
+            style={{
                       backgroundColor: "#333",
                       padding: 12,
                       borderRadius: 8,
@@ -2678,7 +2665,7 @@ export default function Dashboard() {
             flex: 1,
             backgroundColor: "rgba(0, 0, 0, 0.8)",
             justifyContent: "center",
-            alignItems: "center",
+              alignItems: "center",
             padding: 20,
           }}
         >
@@ -2726,6 +2713,7 @@ export default function Dashboard() {
         onClose={() => setShowDayDetail(false)}
         dayData={selectedDayData}
         date={selectedDate}
+        profile={profile}
       />
 
       {/* Modal d'onboarding */}

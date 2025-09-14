@@ -127,3 +127,4 @@ Si des éléments ne respectent pas le design Apple :
 - [ ] L'expérience utilisateur est fluide et intuitive
 - [ ] Tous les éléments sont accessibles et fonctionnels
 - [ ] Le design est cohérent sur toute l'interface
+
