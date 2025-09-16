@@ -10,6 +10,7 @@ export type UserProfile = {
   
   // Informations personnelles
   first_name?: string;    // Prénom de l'utilisateur (compatible Supabase)
+  last_name?: string;     // Nom de l'utilisateur (compatible Supabase)
   age?: number;          // Âge en années
   weight?: number;       // Poids en kg
   height?: number;       // Taille en cm

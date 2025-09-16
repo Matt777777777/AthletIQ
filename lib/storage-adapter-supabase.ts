@@ -1,6 +1,7 @@
 // lib/storage-adapter-supabase.ts
 // Version optimisée pour Supabase uniquement (Phase 4)
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCurrentUserId, getSupabaseClient } from './supabase';
 
 export type StorageError = {
@@ -88,6 +89,20 @@ class SupabaseStorageAdapter {
     this.cache.set(key, data);
     this.lastSync.set(key, Date.now());
 
+    // Vérifier si l'utilisateur est connecté avant d'essayer Supabase
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      console.log(`📱 Utilisateur non connecté, sauvegarde AsyncStorage pour ${key}`);
+      try {
+        await AsyncStorage.setItem(key, JSON.stringify(data));
+        console.log(`✅ Données sauvegardées (AsyncStorage): ${key}`);
+        return;
+      } catch (asyncError) {
+        console.error(`❌ Erreur AsyncStorage pour ${key}:`, asyncError);
+        throw asyncError;
+      }
+    }
+
     try {
       await this.saveToSupabase(key, data);
       console.log(`✅ Données sauvegardées (Supabase): ${key}`);
@@ -112,8 +127,27 @@ class SupabaseStorageAdapter {
       }
     }
 
+    // Vérifier si l'utilisateur est connecté avant d'essayer Supabase
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      console.log(`📱 Utilisateur non connecté, chargement AsyncStorage pour ${key}`);
+      try {
+        const raw = await AsyncStorage.getItem(key);
+        if (raw) {
+          const data = JSON.parse(raw);
+          console.log(`✅ Données chargées (AsyncStorage): ${key}`);
+          return data;
+        }
+        return null;
+      } catch (asyncError) {
+        console.error(`❌ Erreur AsyncStorage pour ${key}:`, asyncError);
+        return null;
+      }
+    }
+
     try {
       const data = await this.loadFromSupabase(key);
+      
       // Mettre à jour le cache
       this.cache.set(key, data);
       this.lastSync.set(key, Date.now());
@@ -128,6 +162,23 @@ class SupabaseStorageAdapter {
   // Supprimer des données
   async remove(key: string): Promise<void> {
     await this.initialize();
+
+    // Vérifier si l'utilisateur est connecté avant d'essayer Supabase
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      console.log(`📱 Utilisateur non connecté, suppression AsyncStorage pour ${key}`);
+      try {
+        await AsyncStorage.removeItem(key);
+        // Supprimer du cache
+        this.cache.delete(key);
+        this.lastSync.delete(key);
+        console.log(`✅ Données supprimées (AsyncStorage): ${key}`);
+        return;
+      } catch (asyncError) {
+        console.error(`❌ Erreur AsyncStorage pour ${key}:`, asyncError);
+        throw asyncError;
+      }
+    }
 
     try {
       await this.removeFromSupabase(key);
@@ -144,7 +195,10 @@ class SupabaseStorageAdapter {
   // Sauvegarder vers Supabase
   private async saveToSupabase(key: string, data: any): Promise<void> {
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error('Utilisateur non connecté');
+    if (!userId) {
+      console.log(`📱 Utilisateur non connecté, skip Supabase pour ${key}`);
+      return; // Retourner sans erreur pour permettre le fallback AsyncStorage
+    }
 
     const tableMapping: { [key: string]: string } = {
       'the_sport_profile_v1': 'profiles',
@@ -204,7 +258,10 @@ class SupabaseStorageAdapter {
   // Charger depuis Supabase
   private async loadFromSupabase(key: string): Promise<any> {
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error('Utilisateur non connecté');
+    if (!userId) {
+      console.log(`📱 Utilisateur non connecté, skip Supabase pour ${key}`);
+      return null; // Retourner null pour permettre le fallback AsyncStorage
+    }
 
     const tableMapping: { [key: string]: string } = {
       'the_sport_profile_v1': 'profiles',
@@ -257,7 +314,10 @@ class SupabaseStorageAdapter {
   // Supprimer depuis Supabase
   private async removeFromSupabase(key: string): Promise<void> {
     const userId = await getCurrentUserId();
-    if (!userId) throw new Error('Utilisateur non connecté');
+    if (!userId) {
+      console.log(`📱 Utilisateur non connecté, skip Supabase pour ${key}`);
+      return; // Retourner sans erreur pour permettre le fallback AsyncStorage
+    }
 
     const tableMapping: { [key: string]: string } = {
       'the_sport_profile_v1': 'profiles',
@@ -706,6 +766,7 @@ class SupabaseStorageAdapter {
     return {
       steps: data.steps,
       lastUpdated: data.last_updated,
+  
     };
   }
 

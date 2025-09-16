@@ -3,7 +3,6 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
     Alert,
-    Image,
     Modal,
     Platform,
     Pressable,
@@ -176,6 +175,108 @@ const cleanWorkoutContent = (content: string): string => {
   return content;
 };
 
+const parseWorkoutContent = (content: string) => {
+  const lines = content.split('\n');
+  const sections = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    if (line.length > 0) {
+      // Vérifier si la ligne commence par un mot-clé
+      const lowerLine = line.toLowerCase();
+      const isTitleLine = lowerLine.startsWith('matériel') || 
+                         lowerLine.startsWith('material') ||
+                         lowerLine.startsWith('durée') || 
+                         lowerLine.startsWith('duration') ||
+                         lowerLine.startsWith('exercices') || 
+                         lowerLine.startsWith('exercises');
+      
+      if (isTitleLine) {
+        // Séparer le mot-clé du reste de la ligne
+        const match = line.match(/^(matériel|material|durée|duration|exercices|exercises)(.*)/i);
+        if (match) {
+          const keyword = match[1];
+          const rest = match[2];
+          
+          sections.push({
+            type: 'title',
+            keyword: keyword,
+            rest: rest,
+            isFirst: i === 0
+          });
+        } else {
+          sections.push({
+            type: 'content',
+            text: line
+          });
+        }
+      } else {
+        sections.push({
+          type: 'content',
+          text: line
+        });
+      }
+    }
+  }
+  
+  return sections;
+};
+
+const parseMealContent = (content: string) => {
+  const lines = content.split('\n');
+  const sections = [];
+  
+  // Ajouter le titre "Ingrédients" au début
+  sections.push({
+    type: 'title',
+    keyword: 'Ingrédients',
+    rest: '',
+    isFirst: true
+  });
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    if (line.length > 0) {
+      // Vérifier si la ligne commence par un mot-clé
+      const lowerLine = line.toLowerCase();
+      const isTitleLine = lowerLine.startsWith('ingrédients') || 
+                         lowerLine.startsWith('ingredients') ||
+                         lowerLine.startsWith('préparation') || 
+                         lowerLine.startsWith('preparation');
+      
+      if (isTitleLine) {
+        // Séparer le mot-clé du reste de la ligne
+        const match = line.match(/^(ingrédients|ingredients|préparation|preparation)(.*)/i);
+        if (match) {
+          const keyword = match[1];
+          const rest = match[2];
+          
+          sections.push({
+            type: 'title',
+            keyword: keyword,
+            rest: rest,
+            isFirst: false
+          });
+        } else {
+          sections.push({
+            type: 'content',
+            text: line
+          });
+        }
+      } else {
+        sections.push({
+          type: 'content',
+          text: line
+        });
+      }
+    }
+  }
+  
+  return sections;
+};
+
 // Options disponibles (mêmes que dans l'onboarding)
 const goals = ["Perdre du poids", "Prendre du muscle", "Être en forme"];
 const diets = ["Végétarien", "Vegan", "Sans gluten", "Aucune restriction"];
@@ -186,7 +287,6 @@ export default function Profile() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingPreferences, setIsEditingPreferences] = useState(false);
-  const [firstName, setFirstName] = useState("");
   const [age, setAge] = useState("");
   const [weight, setWeight] = useState("");
   const [height, setHeight] = useState("");
@@ -215,16 +315,8 @@ export default function Profile() {
   } | null>(null);
   const [showPlanDetail, setShowPlanDetail] = useState(false);
   
-  // États pour la modal de compte
-  const [showAccountModal, setShowAccountModal] = useState(false);
-  const [showChangePassword, setShowChangePassword] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [userEmail, setUserEmail] = useState('');
+  // États pour les informations de compte
   const [profileImage, setProfileImage] = useState<string | null>(null);
-  const [showAccountInfoModal, setShowAccountInfoModal] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState('');
 
   useEffect(() => {
     loadUserProfile();
@@ -238,11 +330,6 @@ export default function Profile() {
   }, [profile]);
 
   // Charger le numéro de téléphone depuis le profil
-  useEffect(() => {
-    if (profile?.phone) {
-      setPhoneNumber(profile.phone);
-    }
-  }, [profile]);
 
   // Fermer toutes les listes déroulantes quand on sort du mode édition
   useEffect(() => {
@@ -260,13 +347,13 @@ export default function Profile() {
     }, [])
   );
 
+
   const loadUserProfile = async () => {
     try {
       const userProfile = await loadProfile();
       console.log('📦 Profil chargé dans l\'écran profil:', userProfile?.saved_plans);
       setProfile(userProfile);
       if (userProfile) {
-        setFirstName(userProfile.first_name || "");
         setAge(userProfile.age?.toString() || "");
         setWeight(userProfile.weight?.toString() || "");
         setHeight(userProfile.height?.toString() || "");
@@ -298,7 +385,7 @@ export default function Profile() {
     try {
       const updatedProfile = {
         ...profile,
-        first_name: firstName.trim() || undefined,
+        first_name: profile?.first_name,
         age: age ? parseInt(age) : undefined,
         weight: weight ? parseFloat(weight) : undefined,
         height: height ? parseFloat(height) : undefined,
@@ -456,52 +543,7 @@ export default function Profile() {
     );
   };
 
-  // Fonctions pour la gestion du compte
-  const loadUserEmail = async () => {
-    try {
-      const { getSupabaseClient } = await import('../../lib/supabase');
-      const client = getSupabaseClient();
-      const { data: { user } } = await client.auth.getUser();
-      if (user?.email) {
-        setUserEmail(user.email);
-      }
-    } catch (error) {
-      console.error('Erreur lors du chargement de l\'email:', error);
-    }
-  };
 
-  const handleChangePassword = async () => {
-    if (!newPassword || !confirmPassword || !currentPassword) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      Alert.alert('Erreur', 'Les nouveaux mots de passe ne correspondent pas');
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      Alert.alert('Erreur', 'Le nouveau mot de passe doit contenir au moins 6 caractères');
-      return;
-    }
-
-    try {
-      const result = await authService.changePassword(currentPassword, newPassword);
-      if (result.success) {
-        Alert.alert('Succès', 'Mot de passe modifié avec succès');
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-        setShowChangePassword(false);
-      } else {
-        Alert.alert('Erreur', result.error || 'Impossible de modifier le mot de passe');
-      }
-    } catch (error) {
-      console.error('Erreur lors du changement de mot de passe:', error);
-      Alert.alert('Erreur', 'Une erreur est survenue');
-    }
-  };
 
   const handleSignOut = () => {
     Alert.alert(
@@ -643,20 +685,6 @@ export default function Profile() {
     }
   };
 
-  const handleSaveAccountInfo = async () => {
-    if (!profile) return;
-
-    try {
-      const updatedProfile = { ...profile, phone: phoneNumber };
-      await saveProfile(updatedProfile);
-      setProfile(updatedProfile);
-      setShowAccountInfoModal(false);
-      Alert.alert("Succès", "Informations de compte mises à jour !");
-    } catch (error) {
-      console.error('Erreur lors de la sauvegarde des informations de compte:', error);
-      Alert.alert('Erreur', 'Impossible de sauvegarder les informations');
-    }
-  };
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: theme.colors.background }} contentContainerStyle={{ 
@@ -678,8 +706,7 @@ export default function Profile() {
         </Text>
         <Pressable
           onPress={() => {
-            loadUserEmail();
-            setShowAccountModal(true);
+            router.push('/settings/account');
           }}
           style={{
             backgroundColor: theme.colors.surface,
@@ -796,14 +823,38 @@ export default function Profile() {
                       minute: '2-digit'
                     })}
                   </Text>
-                  <Text style={{ 
-                    color: theme.colors.textTertiary, 
-                    ...theme.typography.caption, 
-                    marginTop: theme.spacing.xs, 
-                    fontStyle: "italic" 
-                  }}>
-                    {cleanedContent.substring(0, 100)}...
-                  </Text>
+                  <View style={{ marginTop: theme.spacing.xs }}>
+                    {parseWorkoutContent(cleanedContent.substring(0, 200)).map((section, index) => (
+                      section.type === 'title' ? (
+                        <Text key={index} style={{
+                          marginTop: section.isFirst ? 0 : theme.spacing.sm,
+                          marginBottom: theme.spacing.xs
+                        }}>
+                          <Text style={{
+                            color: theme.colors.primary,
+                            ...theme.typography.caption,
+                            fontWeight: '600'
+                          }}>
+                            {section.keyword}
+                          </Text>
+                          <Text style={{
+                            color: theme.colors.textTertiary,
+                            ...theme.typography.caption
+                          }}>
+                            {section.rest}
+                          </Text>
+                        </Text>
+                      ) : (
+                        <Text key={index} style={{
+                          color: theme.colors.textTertiary,
+                          ...theme.typography.caption,
+                          marginBottom: theme.spacing.xs
+                        }}>
+                          {section.text}
+                        </Text>
+                      )
+                    ))}
+                  </View>
                   <View style={{ 
                     flexDirection: "row", 
                     justifyContent: "space-between", 
@@ -879,10 +930,18 @@ export default function Profile() {
               borderRadius: 8,
               alignItems: "center"
             }}>
-              <Text style={{ color: "#666", fontSize: 14, fontStyle: "italic" }}>
+              <Text style={{ 
+                color: theme.colors.textSecondary, 
+                ...theme.typography.caption,
+                fontStyle: "italic" 
+              }}>
                 Aucune séance sauvegardée
               </Text>
-              <Text style={{ color: "#555", fontSize: 12, marginTop: 4 }}>
+              <Text style={{ 
+                color: theme.colors.textTertiary, 
+                ...theme.typography.caption,
+                marginTop: 4 
+              }}>
                 Demande une séance dans le chat pour l'enregistrer ici
               </Text>
             </View>
@@ -1053,10 +1112,18 @@ export default function Profile() {
               borderRadius: 8,
               alignItems: "center"
             }}>
-              <Text style={{ color: "#666", fontSize: 14, fontStyle: "italic" }}>
+              <Text style={{ 
+                color: theme.colors.textSecondary, 
+                ...theme.typography.caption,
+                fontStyle: "italic" 
+              }}>
                 Aucun repas sauvegardé
               </Text>
-              <Text style={{ color: "#555", fontSize: 12, marginTop: 4 }}>
+              <Text style={{ 
+                color: theme.colors.textTertiary, 
+                ...theme.typography.caption,
+                marginTop: 4 
+              }}>
                 Demande un repas dans le chat pour l'enregistrer ici
               </Text>
             </View>
@@ -1154,7 +1221,11 @@ export default function Profile() {
 
         <View style={{ gap: 16 }}>
           <View>
-            <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>
+            <Text style={{ 
+              color: theme.colors.textSecondary, 
+              ...theme.typography.caption, 
+              marginBottom: theme.spacing.xs 
+            }}>
               Sexe
             </Text>
             {isEditing ? (
@@ -1173,12 +1244,20 @@ export default function Profile() {
                       alignItems: "center",
                     }}
                   >
-                    <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600" }}>{g}</Text>
+                    <Text style={{ 
+                color: theme.colors.text, 
+                ...theme.typography.body, 
+                fontWeight: "600" 
+              }}>{g}</Text>
                   </Pressable>
                 ))}
               </View>
             ) : (
-              <Text style={{ color: "#fff", fontSize: 16, paddingVertical: 4 }}>
+              <Text style={{ 
+                color: theme.colors.text, 
+                ...theme.typography.body,
+                paddingVertical: 4 
+              }}>
                 {profile?.gender === "male" ? "Homme" : profile?.gender === "female" ? "Femme" : "Non renseigné"}
               </Text>
             )}
@@ -1194,8 +1273,12 @@ export default function Profile() {
             </Text>
             {isEditing ? (
               <TextInput
-                value={firstName}
-                onChangeText={setFirstName}
+                value={profile?.first_name || ""}
+                onChangeText={(text) => {
+                  if (profile) {
+                    setProfile({ ...profile, first_name: text });
+                  }
+                }}
                 placeholder="Ton prénom"
                 placeholderTextColor={theme.colors.textTertiary}
                 style={{
@@ -1342,7 +1425,11 @@ export default function Profile() {
               }}
             >
               {isEditingPreferences ? (
-                <Text style={{ color: "#ef4444", fontWeight: "600", fontSize: 16 }}>
+                <Text style={{ 
+                  color: "#ef4444", 
+                  ...theme.typography.body,
+                  fontWeight: "600" 
+                }}>
                   ✕
                 </Text>
               ) : (
@@ -1398,38 +1485,44 @@ export default function Profile() {
           </View>
         </View>
 
-        <View style={{ gap: 12 }}>
+        <View style={{ gap: theme.spacing.md }}>
           <View>
-            <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>Objectif</Text>
+            <Text style={{ 
+              color: theme.colors.textSecondary, 
+              ...theme.typography.caption, 
+              marginBottom: theme.spacing.xs 
+            }}>Objectif</Text>
             {isEditingPreferences ? (
               <View>
                 <Pressable
                   onPress={() => setShowGoalDropdown(!showGoalDropdown)}
                   style={{
-                    backgroundColor: "#222",
-                    borderWidth: 1,
-                    borderColor: "#333",
-                    padding: 12,
-                    borderRadius: 8,
+                    ...theme.input,
                     flexDirection: "row",
                     justifyContent: "space-between",
                     alignItems: "center",
                   }}
                 >
-                  <Text style={{ color: goal ? "#fff" : "#666", fontSize: 14 }}>
+                  <Text style={{ 
+                    color: goal ? theme.colors.text : theme.colors.textTertiary, 
+                    ...theme.typography.body 
+                  }}>
                     {goal || "Sélectionner un objectif"}
                   </Text>
-                  <Text style={{ color: "#666", fontSize: 12 }}>
+                  <Text style={{ 
+                    color: theme.colors.textTertiary, 
+                    ...theme.typography.caption 
+                  }}>
                     {showGoalDropdown ? "▲" : "▼"}
                   </Text>
                 </Pressable>
                 {showGoalDropdown && (
                   <View style={{
-                    backgroundColor: "#333",
+                    backgroundColor: theme.colors.surfaceElevated,
                     borderWidth: 1,
-                    borderColor: "#444",
-                    borderRadius: 8,
-                    marginTop: 4,
+                    borderColor: theme.colors.border,
+                    borderRadius: theme.borderRadius.md,
+                    marginTop: theme.spacing.xs,
                     maxHeight: 150,
                   }}>
                     {goals.map((option) => (
@@ -1440,14 +1533,14 @@ export default function Profile() {
                           setShowGoalDropdown(false);
                         }}
                         style={{
-                          padding: 12,
+                          padding: theme.spacing.sm,
                           borderBottomWidth: 1,
-                          borderBottomColor: "#444",
+                          borderBottomColor: theme.colors.border,
                         }}
                       >
                         <Text style={{ 
-                          color: goal === option ? "#0070F3" : "#fff", 
-                          fontSize: 14,
+                          color: goal === option ? theme.colors.primary : theme.colors.text, 
+                          ...theme.typography.body,
                           fontWeight: goal === option ? "600" : "400"
                         }}>
                           {option}
@@ -1458,43 +1551,53 @@ export default function Profile() {
                 )}
               </View>
             ) : (
-              <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600" }}>
+              <Text style={{ 
+                color: theme.colors.text, 
+                ...theme.typography.body, 
+                fontWeight: "600" 
+              }}>
                 {profile?.goal || "Non défini"}
               </Text>
             )}
           </View>
 
           <View>
-            <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>Séances/semaine</Text>
+            <Text style={{ 
+              color: theme.colors.textSecondary, 
+              ...theme.typography.caption, 
+              marginBottom: theme.spacing.xs 
+            }}>Séances/semaine</Text>
             {isEditingPreferences ? (
               <View>
                 <Pressable
                   onPress={() => setShowSessionsDropdown(!showSessionsDropdown)}
                   style={{
-                    backgroundColor: "#222",
-                    borderWidth: 1,
-                    borderColor: "#333",
-                    padding: 12,
-                    borderRadius: 8,
+                    ...theme.input,
                     flexDirection: "row",
                     justifyContent: "space-between",
                     alignItems: "center",
                   }}
                 >
-                  <Text style={{ color: sessions ? "#fff" : "#666", fontSize: 14 }}>
+                  <Text style={{ 
+                    color: sessions ? theme.colors.text : theme.colors.textTertiary, 
+                    ...theme.typography.body 
+                  }}>
                     {sessions || "Sélectionner le nombre"}
                   </Text>
-                  <Text style={{ color: "#666", fontSize: 12 }}>
+                  <Text style={{ 
+                    color: theme.colors.textTertiary, 
+                    ...theme.typography.caption 
+                  }}>
                     {showSessionsDropdown ? "▲" : "▼"}
                   </Text>
                 </Pressable>
                 {showSessionsDropdown && (
                   <View style={{
-                    backgroundColor: "#333",
+                    backgroundColor: theme.colors.surfaceElevated,
                     borderWidth: 1,
-                    borderColor: "#444",
-                    borderRadius: 8,
-                    marginTop: 4,
+                    borderColor: theme.colors.border,
+                    borderRadius: theme.borderRadius.md,
+                    marginTop: theme.spacing.xs,
                     maxHeight: 150,
                   }}>
                     {sessionsOptions.map((option) => (
@@ -1505,14 +1608,14 @@ export default function Profile() {
                           setShowSessionsDropdown(false);
                         }}
                         style={{
-                          padding: 12,
+                          padding: theme.spacing.sm,
                           borderBottomWidth: 1,
-                          borderBottomColor: "#444",
+                          borderBottomColor: theme.colors.border,
                         }}
                       >
                         <Text style={{ 
-                          color: sessions === option.toString() ? "#0070F3" : "#fff", 
-                          fontSize: 14,
+                          color: sessions === option.toString() ? theme.colors.primary : theme.colors.text, 
+                          ...theme.typography.body,
                           fontWeight: sessions === option.toString() ? "600" : "400"
                         }}>
                           {option}
@@ -1523,43 +1626,53 @@ export default function Profile() {
                 )}
               </View>
             ) : (
-              <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600" }}>
+              <Text style={{ 
+                color: theme.colors.text, 
+                ...theme.typography.body, 
+                fontWeight: "600" 
+              }}>
                 {profile?.sessions || 0}
               </Text>
             )}
           </View>
 
           <View>
-            <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>Régime alimentaire</Text>
+            <Text style={{ 
+              color: theme.colors.textSecondary, 
+              ...theme.typography.caption, 
+              marginBottom: theme.spacing.xs 
+            }}>Régime alimentaire</Text>
             {isEditingPreferences ? (
               <View>
                 <Pressable
                   onPress={() => setShowDietDropdown(!showDietDropdown)}
-                  style={{
-                    backgroundColor: "#222",
-                    borderWidth: 1,
-                    borderColor: "#333",
-                    padding: 12,
-                    borderRadius: 8,
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
+                style={{
+                  ...theme.input,
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
                 >
-                  <Text style={{ color: diet ? "#fff" : "#666", fontSize: 14 }}>
+                  <Text style={{ 
+                    color: diet ? theme.colors.text : theme.colors.textTertiary, 
+                    ...theme.typography.body 
+                  }}>
                     {diet || "Sélectionner un régime"}
                   </Text>
-                  <Text style={{ color: "#666", fontSize: 12 }}>
+                  <Text style={{ 
+                    color: theme.colors.textTertiary, 
+                    ...theme.typography.caption 
+                  }}>
                     {showDietDropdown ? "▲" : "▼"}
                   </Text>
                 </Pressable>
                 {showDietDropdown && (
                   <View style={{
-                    backgroundColor: "#333",
+                    backgroundColor: theme.colors.surfaceElevated,
                     borderWidth: 1,
-                    borderColor: "#444",
-                    borderRadius: 8,
-                    marginTop: 4,
+                    borderColor: theme.colors.border,
+                    borderRadius: theme.borderRadius.md,
+                    marginTop: theme.spacing.xs,
                     maxHeight: 150,
                   }}>
                     {diets.map((option) => (
@@ -1570,14 +1683,14 @@ export default function Profile() {
                           setShowDietDropdown(false);
                         }}
                         style={{
-                          padding: 12,
+                          padding: theme.spacing.sm,
                           borderBottomWidth: 1,
-                          borderBottomColor: "#444",
+                          borderBottomColor: theme.colors.border,
                         }}
                       >
                         <Text style={{ 
-                          color: diet === option ? "#0070F3" : "#fff", 
-                          fontSize: 14,
+                          color: diet === option ? theme.colors.primary : theme.colors.text, 
+                          ...theme.typography.body,
                           fontWeight: diet === option ? "600" : "400"
                         }}>
                           {option}
@@ -1588,132 +1701,146 @@ export default function Profile() {
                 )}
               </View>
             ) : (
-              <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600" }}>
+              <Text style={{ 
+                color: theme.colors.text, 
+                ...theme.typography.body, 
+                fontWeight: "600" 
+              }}>
                 {profile?.diet || "Non défini"}
               </Text>
             )}
           </View>
 
           <View>
-            <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>Niveau de sport</Text>
+            <Text style={{ 
+              color: theme.colors.textSecondary, 
+              ...theme.typography.caption, 
+              marginBottom: theme.spacing.xs 
+            }}>Niveau de sport</Text>
             {isEditingPreferences ? (
               <TextInput
                 value={fitnessLevel}
                 onChangeText={setFitnessLevel}
                 placeholder="Ex: Débutant, Intermédiaire, Avancé..."
-                placeholderTextColor="#666"
+                placeholderTextColor={theme.colors.textTertiary}
                 style={{
-                  backgroundColor: "#222",
-                  borderWidth: 1,
-                  borderColor: "#333",
-                  padding: 12,
-                  borderRadius: 8,
-                  color: "#fff",
-                  fontSize: 14,
+                  ...theme.input,
                 }}
               />
             ) : (
-              <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600" }}>
+              <Text style={{ 
+                color: theme.colors.text, 
+                ...theme.typography.body, 
+                fontWeight: "600" 
+              }}>
                 {profile?.chat_responses?.fitnessLevel || profile?.fitness_level || "Non défini"}
               </Text>
             )}
           </View>
 
           <View>
-            <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>Matériel</Text>
+            <Text style={{ 
+              color: theme.colors.textSecondary, 
+              ...theme.typography.caption, 
+              marginBottom: theme.spacing.xs 
+            }}>Matériel</Text>
             {isEditingPreferences ? (
               <TextInput
                 value={equipment}
                 onChangeText={setEquipment}
                 placeholder="Ex: Aucun, Basique, Complet..."
-                placeholderTextColor="#666"
+                placeholderTextColor={theme.colors.textTertiary}
                 style={{
-                  backgroundColor: "#222",
-                  borderWidth: 1,
-                  borderColor: "#333",
-                  padding: 12,
-                  borderRadius: 8,
-                  color: "#fff",
-                  fontSize: 14,
+                  ...theme.input,
                 }}
               />
             ) : (
-              <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600" }}>
+              <Text style={{ 
+                color: theme.colors.text, 
+                ...theme.typography.body, 
+                fontWeight: "600" 
+              }}>
                 {profile?.chat_responses?.equipment || profile?.equipment || "Non défini"}
               </Text>
             )}
           </View>
 
           <View>
-            <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>Intolérances</Text>
+            <Text style={{ 
+              color: theme.colors.textSecondary, 
+              ...theme.typography.caption, 
+              marginBottom: theme.spacing.xs 
+            }}>Intolérances</Text>
             {isEditingPreferences ? (
               <TextInput
                 value={intolerances}
                 onChangeText={setIntolerances}
                 placeholder="Ex: Lactose, Gluten, Aucune..."
-                placeholderTextColor="#666"
+                placeholderTextColor={theme.colors.textTertiary}
                 style={{
-                  backgroundColor: "#222",
-                  borderWidth: 1,
-                  borderColor: "#333",
-                  padding: 12,
-                  borderRadius: 8,
-                  color: "#fff",
-                  fontSize: 14,
+                  ...theme.input,
                 }}
               />
             ) : (
-              <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600" }}>
+              <Text style={{ 
+                color: theme.colors.text, 
+                ...theme.typography.body, 
+                fontWeight: "600" 
+              }}>
                 {profile?.chat_responses?.intolerances || profile?.intolerances || "Non défini"}
               </Text>
             )}
           </View>
 
           <View>
-            <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>Limitations</Text>
+            <Text style={{ 
+              color: theme.colors.textSecondary, 
+              ...theme.typography.caption, 
+              marginBottom: theme.spacing.xs 
+            }}>Limitations</Text>
             {isEditingPreferences ? (
               <TextInput
                 value={limitations}
                 onChangeText={setLimitations}
                 placeholder="Ex: Problèmes de dos, Aucune..."
-                placeholderTextColor="#666"
+                placeholderTextColor={theme.colors.textTertiary}
                 style={{
-                  backgroundColor: "#222",
-                  borderWidth: 1,
-                  borderColor: "#333",
-                  padding: 12,
-                  borderRadius: 8,
-                  color: "#fff",
-                  fontSize: 14,
+                  ...theme.input,
                 }}
               />
             ) : (
-              <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600" }}>
+              <Text style={{ 
+                color: theme.colors.text, 
+                ...theme.typography.body, 
+                fontWeight: "600" 
+              }}>
                 {profile?.chat_responses?.limitations || profile?.limitations || "Non défini"}
               </Text>
             )}
           </View>
 
           <View>
-            <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>Horaires préférés</Text>
+            <Text style={{ 
+              color: theme.colors.textSecondary, 
+              ...theme.typography.caption, 
+              marginBottom: theme.spacing.xs 
+            }}>Horaires préférés</Text>
             {isEditingPreferences ? (
               <TextInput
                 value={preferredTime}
                 onChangeText={setPreferredTime}
                 placeholder="Ex: Matin, Midi, Soir, Flexible..."
-                placeholderTextColor="#666"
+                placeholderTextColor={theme.colors.textTertiary}
                 style={{
-                  backgroundColor: "#222",
-                  borderWidth: 1,
-                  borderColor: "#333",
-                  padding: 12,
-                  borderRadius: 8,
-                  color: "#fff",
-                  fontSize: 14,
+                  ...theme.input,
                 }}
               />
             ) : (
-              <Text style={{ color: "#fff", fontSize: 14, fontWeight: "600" }}>
+              <Text style={{ 
+                color: theme.colors.text, 
+                ...theme.typography.body, 
+                fontWeight: "600" 
+              }}>
                 {profile?.chat_responses?.preferredTime || profile?.preferred_time || "Non défini"}
               </Text>
             )}
@@ -1725,14 +1852,14 @@ export default function Profile() {
           <Pressable
             onPress={handleSavePreferences}
             style={{
-              backgroundColor: "#0070F3",
-              paddingVertical: 12,
-              borderRadius: 8,
-              alignItems: "center",
-              marginTop: 16,
+              ...theme.button.primary,
+              marginTop: theme.spacing.md,
             }}
           >
-            <Text style={{ color: "#fff", fontWeight: "700" }}>Sauvegarder les préférences</Text>
+            <Text style={{ 
+              color: theme.colors.text, 
+              ...theme.typography.button 
+            }}>Sauvegarder les préférences</Text>
           </Pressable>
         )}
       </View>
@@ -1740,11 +1867,17 @@ export default function Profile() {
 
 
       {/* Section Actions */}
-      <View style={{ marginBottom: 20 }}>
-
-
-
-
+      <View style={{ 
+        ...theme.card,
+        marginBottom: theme.spacing.lg
+      }}>
+        <Text style={{ 
+          color: theme.colors.text, 
+          ...theme.typography.h4, 
+          marginBottom: theme.spacing.md 
+        }}>
+          Actions
+        </Text>
 
         {/* Bouton pour réinitialiser l'onboarding du dashboard */}
         <Pressable
@@ -1757,16 +1890,16 @@ export default function Profile() {
             }
           }}
           style={{
-            backgroundColor: "#1a2a4a",
-            paddingVertical: 12,
-            borderRadius: 12,
-            alignItems: "center",
-            borderWidth: 1,
-            borderColor: "#2a4a6a",
-            marginBottom: 12,
+            ...theme.button.secondary,
+            marginBottom: theme.spacing.sm,
           }}
         >
-          <Text style={{ color: "#60A5FA", fontWeight: "700" }}>Réinitialiser l'onboarding du dashboard</Text>
+          <Text style={{ 
+            color: theme.colors.primary, 
+            ...theme.typography.button 
+          }}>
+            Réinitialiser l'onboarding du dashboard
+          </Text>
         </Pressable>
 
         {/* Bouton de test pour réinitialiser l'onboarding */}
@@ -1776,16 +1909,18 @@ export default function Profile() {
             router.replace("/");
           }}
           style={{
-            backgroundColor: "#2a1a1a",
-            paddingVertical: 12,
-            borderRadius: 12,
-            alignItems: "center",
-            borderWidth: 1,
-            borderColor: "#4a2a2a",
-            marginBottom: 12,
+            ...theme.button.secondary,
+            marginBottom: theme.spacing.sm,
+            backgroundColor: theme.colors.surface,
+            borderColor: "#ff6b6b",
           }}
         >
-          <Text style={{ color: "#ff6b6b", fontWeight: "700" }}>Réinitialiser l'onboarding (test)</Text>
+          <Text style={{ 
+            color: "#ff6b6b", 
+            ...theme.typography.button 
+          }}>
+            Réinitialiser l'onboarding (test)
+          </Text>
         </Pressable>
 
         {/* Bouton de test pour réinitialiser les questions du chat */}
@@ -1799,15 +1934,15 @@ export default function Profile() {
             }
           }}
           style={{
-            backgroundColor: "#1a1f2e",
-            paddingVertical: 12,
-            borderRadius: 12,
-            alignItems: "center",
-            borderWidth: 1,
-            borderColor: "#2a3a4a",
+            ...theme.button.secondary,
           }}
         >
-          <Text style={{ color: "#60A5FA", fontWeight: "700" }}>Réinitialiser les questions du chat (test)</Text>
+          <Text style={{ 
+            color: theme.colors.primary, 
+            ...theme.typography.button 
+          }}>
+            Réinitialiser les questions du chat (test)
+          </Text>
         </Pressable>
       </View>
 
@@ -1817,73 +1952,6 @@ export default function Profile() {
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => setShowPlanDetail(false)}
-      >
-        <View style={{ flex: 1, backgroundColor: "#000" }}>
-          {/* Header de la modal */}
-          <View style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-            paddingTop: 60,
-            paddingHorizontal: 20,
-            paddingBottom: 20,
-            borderBottomWidth: 1,
-            borderBottomColor: "#333"
-          }}>
-            <Text style={{ color: "#fff", fontSize: 20, fontWeight: "700" }}>
-              {selectedPlan?.title}
-            </Text>
-            <Pressable
-              onPress={() => setShowPlanDetail(false)}
-              style={{
-                backgroundColor: "transparent",
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-                borderRadius: 8
-              }}
-            >
-              <Text style={{ color: "transparent", fontWeight: "600" }}>Fermer</Text>
-            </Pressable>
-          </View>
-
-          {/* Contenu du plan */}
-          <ScrollView style={{ flex: 1, padding: 20 }}>
-            <View style={{
-              backgroundColor: selectedPlan?.type === 'workout' ? "#1a1f2e" : "#1a1f3a",
-              padding: 20,
-              borderRadius: 12,
-              borderLeftWidth: 4,
-              borderLeftColor: selectedPlan?.type === 'workout' ? "#60A5FA" : "#3B82F6"
-            }}>
-              <Text style={{ color: "#aaa", fontSize: 14, marginBottom: 8 }}>
-                Sauvegardé le {selectedPlan?.date ? new Date(selectedPlan.date).toLocaleDateString('fr-FR', {
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                }) : ''}
-              </Text>
-              
-              <Text style={{ 
-                color: "#fff", 
-                fontSize: 16, 
-                lineHeight: 24,
-                fontFamily: "monospace"
-              }}>
-                {selectedPlan?.content}
-              </Text>
-            </View>
-          </ScrollView>
-        </View>
-      </Modal>
-
-      {/* Modal de gestion du compte */}
-      <Modal
-        visible={showAccountModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowAccountModal(false)}
       >
         <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
           {/* Header de la modal */}
@@ -1898,645 +1966,94 @@ export default function Profile() {
             borderBottomWidth: 1,
             borderBottomColor: theme.colors.border
           }}>
+            <Text 
+              style={{ 
+                color: theme.colors.text, 
+                ...theme.typography.h4,
+                flex: 1,
+                marginRight: theme.spacing.sm
+              }}
+              numberOfLines={2}
+              ellipsizeMode="tail"
+            >
+              {selectedPlan?.title}
+            </Text>
             <Pressable
-              onPress={() => setShowAccountModal(false)}
+              onPress={() => setShowPlanDetail(false)}
               style={{
-                padding: theme.spacing.sm,
+                backgroundColor: "transparent",
+                paddingHorizontal: theme.spacing.sm,
+                paddingVertical: theme.spacing.xs,
+                borderRadius: theme.borderRadius.sm
               }}
             >
               <Text style={{ 
-                color: theme.colors.text, 
+                color: theme.colors.textSecondary, 
                 ...theme.typography.h4 
-              }}>←</Text>
+              }}>✕</Text>
             </Pressable>
-            <Text style={{ 
-              color: theme.colors.text, 
-              ...theme.typography.h4 
-            }}>
-              Mon compte
-            </Text>
-            <View style={{ width: 34 }} />
           </View>
 
-          <ScrollView style={{ flex: 1 }}>
-            {/* Section Profil */}
+          {/* Contenu du plan */}
+          <ScrollView style={{ flex: 1, padding: theme.spacing.lg }}>
             <View style={{
               ...theme.card,
-              marginTop: theme.spacing.lg,
-              marginHorizontal: theme.spacing.md,
-              marginBottom: theme.spacing.md,
+              borderLeftWidth: 4,
+              borderLeftColor: selectedPlan?.type === 'workout' ? theme.colors.primary : theme.colors.primary
             }}>
-              <View style={{ 
-                alignItems: "center", 
-                marginBottom: theme.spacing.md 
+              <Text style={{ 
+                color: theme.colors.textSecondary, 
+                ...theme.typography.caption, 
+                marginBottom: theme.spacing.sm 
               }}>
-                <View style={{
-                  width: 80,
-                  height: 80,
-                  borderRadius: 40,
-                  backgroundColor: theme.colors.primary,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  marginBottom: theme.spacing.sm,
-                  borderWidth: 3,
-                  borderColor: theme.colors.border,
-                  overflow: "hidden",
-                }}>
-                  {profileImage || profile?.profileImage ? (
-                    <Image
-                      source={{ uri: profileImage || profile?.profileImage }}
-                      style={{
-                        width: 74,
-                        height: 74,
-                        borderRadius: 37,
-                      }}
-                      resizeMode="cover"
-                    />
+                Sauvegardé le {selectedPlan?.date ? new Date(selectedPlan.date).toLocaleDateString('fr-FR', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                }) : ''}
+              </Text>
+              
+              <View>
+                {selectedPlan?.content ? (selectedPlan.type === 'workout' ? 
+                  parseWorkoutContent(selectedPlan.content) : 
+                  parseMealContent(selectedPlan.content)
+                ).map((section, index) => (
+                  section.type === 'title' ? (
+                    <Text key={index} style={{
+                      marginTop: section.isFirst ? 0 : theme.spacing.md,
+                      marginBottom: theme.spacing.sm,
+                      lineHeight: 24
+                    }}>
+                      <Text style={{
+                        color: theme.colors.primary,
+                        ...theme.typography.body,
+                        fontWeight: '600'
+                      }}>
+                        {section.keyword}
+                      </Text>
+                      <Text style={{
+                        color: theme.colors.text,
+                        ...theme.typography.body,
+                        fontFamily: "monospace"
+                      }}>
+                        {section.rest}
+                      </Text>
+                    </Text>
                   ) : (
-                    <Text style={{ 
-                      color: theme.colors.text, 
-                      fontSize: 32, 
-                      fontWeight: "800" 
-                    }}>👨‍💼</Text>
-                  )}
-                </View>
-                <Text style={{ 
-                  color: theme.colors.text, 
-                  ...theme.typography.h3, 
-                  marginBottom: theme.spacing.xs 
-                }}>
-                  {profile?.first_name || "Utilisateur"}
-                </Text>
-                <Pressable
-                  onPress={handleSelectProfileImage}
-                  style={{
-                    ...theme.button.secondary,
-                    paddingHorizontal: theme.spacing.md,
-                    paddingVertical: theme.spacing.xs,
-                    borderRadius: 20,
-                  }}
-                >
-                  <Text style={{ 
-                    color: theme.colors.primary, 
-                    ...theme.typography.caption 
-                  }}>
-                    Modifier la photo
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-
-            {/* Section Informations de compte */}
-            <View style={{
-              ...theme.card,
-              marginHorizontal: theme.spacing.md,
-              marginBottom: theme.spacing.md,
-            }}>
-              <Pressable
-                onPress={() => setShowAccountInfoModal(true)}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  padding: theme.spacing.md,
-                  borderBottomWidth: 1,
-                  borderBottomColor: theme.colors.border,
-                }}
-              >
-                <View style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  backgroundColor: theme.colors.surface,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  marginRight: theme.spacing.sm,
-                }}>
-                  <Text style={{ 
-                    color: theme.colors.primary, 
-                    fontSize: 18 
-                  }}>👤</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ 
-                    color: theme.colors.text, 
-                    ...theme.typography.body 
-                  }}>
-                    Informations de compte
-                  </Text>
-                  <Text style={{ 
-                    color: theme.colors.textSecondary, 
-                    ...theme.typography.caption, 
-                    marginTop: theme.spacing.xs 
-                  }}>
-                    {userEmail || "Chargement..."}
-                  </Text>
-                </View>
-                <Text style={{ 
-                  color: theme.colors.textSecondary, 
-                  fontSize: 18 
-                }}>›</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={() => setShowChangePassword(!showChangePassword)}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  padding: theme.spacing.md,
-                  borderBottomWidth: 1,
-                  borderBottomColor: theme.colors.border,
-                }}
-              >
-                <View style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  backgroundColor: theme.colors.surface,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  marginRight: theme.spacing.sm,
-                }}>
-                  <Text style={{ 
-                    color: theme.colors.primary, 
-                    fontSize: 18 
-                  }}>🔐</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ 
-                    color: theme.colors.text, 
-                    ...theme.typography.body 
-                  }}>
-                    Connexion et sécurité
-                  </Text>
-                  <Text style={{ 
-                    color: theme.colors.textSecondary, 
-                    ...theme.typography.caption, 
-                    marginTop: theme.spacing.xs 
-                  }}>
-                    Mot de passe et authentification
-                  </Text>
-                </View>
-                <Text style={{ 
-                  color: theme.colors.textSecondary, 
-                  fontSize: 18 
-                }}>›</Text>
-              </Pressable>
-
-              <Pressable
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  padding: theme.spacing.md,
-                  borderBottomWidth: 1,
-                  borderBottomColor: theme.colors.border,
-                }}
-              >
-                <View style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  backgroundColor: theme.colors.surface,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  marginRight: theme.spacing.sm,
-                }}>
-                  <Text style={{ 
-                    color: theme.colors.primary, 
-                    fontSize: 18 
-                  }}>🔒</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ 
-                    color: theme.colors.text, 
-                    ...theme.typography.body 
-                  }}>
-                    Données et confidentialité
-                  </Text>
-                  <Text style={{ 
-                    color: theme.colors.textSecondary, 
-                    ...theme.typography.caption, 
-                    marginTop: theme.spacing.xs 
-                  }}>
-                    Gérer vos données personnelles
-                  </Text>
-                </View>
-                <Text style={{ 
-                  color: theme.colors.textSecondary, 
-                  fontSize: 18 
-                }}>›</Text>
-              </Pressable>
-
-              <Pressable
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  padding: theme.spacing.md,
-                }}
-              >
-                <View style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  backgroundColor: theme.colors.surface,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  marginRight: theme.spacing.sm,
-                }}>
-                  <Text style={{ 
-                    color: theme.colors.primary, 
-                    fontSize: 18 
-                  }}>🔔</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ 
-                    color: theme.colors.text, 
-                    ...theme.typography.body 
-                  }}>
-                    Préférences de notification
-                  </Text>
-                  <Text style={{ 
-                    color: theme.colors.textSecondary, 
-                    ...theme.typography.caption, 
-                    marginTop: theme.spacing.xs 
-                  }}>
-                    Personnaliser vos notifications
-                  </Text>
-                </View>
-                <Text style={{ 
-                  color: theme.colors.textSecondary, 
-                  fontSize: 18 
-                }}>›</Text>
-              </Pressable>
-            </View>
-
-            {/* Section Aide */}
-            <View style={{
-              ...theme.card,
-              marginHorizontal: theme.spacing.md,
-              marginBottom: theme.spacing.md,
-            }}>
-              <Pressable
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  padding: theme.spacing.md,
-                }}
-              >
-                <View style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  backgroundColor: theme.colors.surface,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  marginRight: theme.spacing.sm,
-                }}>
-                  <Text style={{ 
-                    color: theme.colors.primary, 
-                    fontSize: 18 
-                  }}>💬</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ 
-                    color: theme.colors.text, 
-                    ...theme.typography.body 
-                  }}>
-                    Aide
-                  </Text>
-                  <Text style={{ 
-                    color: theme.colors.textSecondary, 
-                    ...theme.typography.caption, 
-                    marginTop: theme.spacing.xs 
-                  }}>
-                    Support et FAQ
-                  </Text>
-                </View>
-                <Text style={{ 
-                  color: theme.colors.textSecondary, 
-                  fontSize: 18 
-                }}>›</Text>
-              </Pressable>
-            </View>
-
-            {/* Formulaire de changement de mot de passe */}
-            {showChangePassword && (
-              <View style={{
-                ...theme.card,
-                marginHorizontal: theme.spacing.md,
-                marginBottom: theme.spacing.md,
-              }}>
-                <Text style={{ 
-                  color: theme.colors.text, 
-                  ...theme.typography.h4, 
-                  marginBottom: theme.spacing.md 
-                }}>
-                  Changer le mot de passe
-                </Text>
-                
-                <Text style={{ 
-                  color: theme.colors.textSecondary, 
-                  ...theme.typography.caption, 
-                  marginBottom: theme.spacing.xs 
-                }}>
-                  Mot de passe actuel
-                </Text>
-                <TextInput
-                  style={{
-                    ...theme.input,
-                    marginBottom: theme.spacing.md
-                  }}
-                  value={currentPassword}
-                  onChangeText={setCurrentPassword}
-                  placeholder="Mot de passe actuel"
-                  secureTextEntry
-                  placeholderTextColor={theme.colors.textTertiary}
-                />
-
-                <Text style={{ 
-                  color: theme.colors.textSecondary, 
-                  ...theme.typography.caption, 
-                  marginBottom: theme.spacing.xs 
-                }}>
-                  Nouveau mot de passe
-                </Text>
-                <TextInput
-                  style={{
-                    ...theme.input,
-                    marginBottom: theme.spacing.md
-                  }}
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  placeholder="Nouveau mot de passe"
-                  secureTextEntry
-                  placeholderTextColor={theme.colors.textTertiary}
-                />
-
-                <Text style={{ 
-                  color: theme.colors.textSecondary, 
-                  ...theme.typography.caption, 
-                  marginBottom: theme.spacing.xs 
-                }}>
-                  Confirmer le nouveau mot de passe
-                </Text>
-                <TextInput
-                  style={{
-                    ...theme.input,
-                    marginBottom: theme.spacing.lg
-                  }}
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  placeholder="Confirmer le nouveau mot de passe"
-                  secureTextEntry
-                  placeholderTextColor={theme.colors.textTertiary}
-                />
-
-                <View style={{ 
-                  flexDirection: "row", 
-                  gap: theme.spacing.sm 
-                }}>
-                  <Pressable
-                    onPress={handleChangePassword}
-                    style={{
-                      ...theme.button.primary,
-                      flex: 1
-                    }}
-                  >
-                    <Text style={{ 
-                      color: theme.colors.text, 
-                      ...theme.typography.button, 
-                      textAlign: "center" 
+                    <Text key={index} style={{
+                      color: theme.colors.text,
+                      ...theme.typography.body,
+                      marginBottom: theme.spacing.sm,
+                      lineHeight: 24,
+                      fontFamily: "monospace"
                     }}>
-                      Modifier
+                      {section.text}
                     </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => {
-                      setShowChangePassword(false);
-                      setCurrentPassword('');
-                      setNewPassword('');
-                      setConfirmPassword('');
-                    }}
-                    style={{
-                      ...theme.button.secondary,
-                      flex: 1
-                    }}
-                  >
-                    <Text style={{ 
-                      color: theme.colors.primary, 
-                      ...theme.typography.button, 
-                      textAlign: "center" 
-                    }}>
-                      Annuler
-                    </Text>
-                  </Pressable>
-                </View>
+                  )
+                )) : null}
               </View>
-            )}
-
-            {/* Section Actions du compte */}
-            <View style={{
-              ...theme.card,
-              marginHorizontal: theme.spacing.md,
-              marginBottom: theme.spacing.lg,
-            }}>
-              <Pressable
-                onPress={handleDeleteAccount}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  padding: theme.spacing.md,
-                  borderBottomWidth: 1,
-                  borderBottomColor: theme.colors.border,
-                }}
-              >
-                <View style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  backgroundColor: "#2a1a1a",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  marginRight: theme.spacing.sm,
-                }}>
-                  <Text style={{ color: "#ff4444", fontSize: 18 }}>🗑️</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ 
-                    color: "#ff4444", 
-                    ...theme.typography.body 
-                  }}>
-                    Fermer le compte
-                  </Text>
-                  <Text style={{ 
-                    color: theme.colors.textSecondary, 
-                    ...theme.typography.caption, 
-                    marginTop: theme.spacing.xs 
-                  }}>
-                    Supprimer définitivement votre compte
-                  </Text>
-                </View>
-                <Text style={{ 
-                  color: theme.colors.textSecondary, 
-                  fontSize: 18 
-                }}>›</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={handleSignOut}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  padding: theme.spacing.md,
-                }}
-              >
-                <View style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  backgroundColor: "#2a1a1a",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  marginRight: theme.spacing.sm,
-                }}>
-                  <Text style={{ color: "#ff6b6b", fontSize: 18 }}>↗️</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ 
-                    color: "#ff6b6b", 
-                    ...theme.typography.body 
-                  }}>
-                    Déconnexion
-                  </Text>
-                  <Text style={{ 
-                    color: theme.colors.textSecondary, 
-                    ...theme.typography.caption, 
-                    marginTop: theme.spacing.xs 
-                  }}>
-                    Se déconnecter de votre compte
-                  </Text>
-                </View>
-                <Text style={{ 
-                  color: theme.colors.textSecondary, 
-                  fontSize: 18 
-                }}>›</Text>
-              </Pressable>
-            </View>
-          </ScrollView>
-        </View>
-      </Modal>
-
-      {/* Modal des informations de compte */}
-      <Modal
-        visible={showAccountInfoModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowAccountInfoModal(false)}
-      >
-        <View style={{ flex: 1, backgroundColor: "#000" }}>
-          {/* Header de la modal */}
-          <View style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-            paddingTop: 60,
-            paddingHorizontal: 20,
-            paddingBottom: 20,
-            backgroundColor: "#111",
-            borderBottomWidth: 1,
-            borderBottomColor: "#333"
-          }}>
-            <Pressable
-              onPress={() => setShowAccountInfoModal(false)}
-              style={{
-                padding: 8,
-              }}
-            >
-              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "600" }}>←</Text>
-            </Pressable>
-            <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700" }}>
-              Informations de compte
-            </Text>
-            <View style={{ width: 34 }} />
-          </View>
-
-          <ScrollView style={{ flex: 1, padding: 20 }}>
-            {/* Section Email */}
-            <View style={{
-              backgroundColor: "#111",
-              borderRadius: 12,
-              padding: 20,
-              marginBottom: 20,
-              borderWidth: 1,
-              borderColor: "#333"
-            }}>
-              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700", marginBottom: 16 }}>
-                Email
-              </Text>
-              <Text style={{ color: "#aaa", fontSize: 16 }}>
-                {userEmail || "Chargement..."}
-              </Text>
-            </View>
-
-            {/* Section Numéro de téléphone */}
-            <View style={{
-              backgroundColor: "#111",
-              borderRadius: 12,
-              padding: 20,
-              marginBottom: 20,
-              borderWidth: 1,
-              borderColor: "#333"
-            }}>
-              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700", marginBottom: 16 }}>
-                Numéro de téléphone
-              </Text>
-              <TextInput
-                style={{
-                  backgroundColor: "#1a1a1a",
-                  color: "#fff",
-                  padding: 12,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: "#333",
-                  fontSize: 16
-                }}
-                value={phoneNumber}
-                onChangeText={setPhoneNumber}
-                placeholder="Entrez votre numéro de téléphone"
-                placeholderTextColor="#666"
-                keyboardType="phone-pad"
-              />
-            </View>
-
-            {/* Boutons d'action */}
-            <View style={{ flexDirection: "row", gap: 12 }}>
-              <Pressable
-                onPress={handleSaveAccountInfo}
-                style={{
-                  backgroundColor: "#0070F3",
-                  paddingHorizontal: 20,
-                  paddingVertical: 12,
-                  borderRadius: 8,
-                  flex: 1
-                }}
-              >
-                <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600", textAlign: "center" }}>
-                  Sauvegarder
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setShowAccountInfoModal(false)}
-                style={{
-                  backgroundColor: "#333",
-                  paddingHorizontal: 20,
-                  paddingVertical: 12,
-                  borderRadius: 8,
-                  flex: 1
-                }}
-              >
-                <Text style={{ color: "#fff", fontSize: 16, fontWeight: "600", textAlign: "center" }}>
-                  Annuler
-                </Text>
-              </Pressable>
             </View>
           </ScrollView>
         </View>
