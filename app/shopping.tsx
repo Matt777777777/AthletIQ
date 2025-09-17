@@ -154,8 +154,6 @@ export default function Shopping() {
       
       // Refresh de la liste
       refresh();
-      
-      Alert.alert("Succès", "Ingrédient ajouté à la liste !");
     } catch (error) {
       Alert.alert("Erreur", "Impossible d'ajouter l'ingrédient");
     }

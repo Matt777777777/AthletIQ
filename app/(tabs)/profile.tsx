@@ -280,7 +280,7 @@ const parseMealContent = (content: string) => {
 // Options disponibles (mêmes que dans l'onboarding)
 const goals = ["Perdre du poids", "Prendre du muscle", "Être en forme"];
 const diets = ["Végétarien", "Vegan", "Sans gluten", "Aucune restriction"];
-const sessionsOptions = [2, 3, 4, 5, 6, 7];
+const sessionsOptions = [1, 2, 3, 4, 5, 6];
 
 export default function Profile() {
   const router = useRouter();
@@ -1525,28 +1525,34 @@ export default function Profile() {
                     marginTop: theme.spacing.xs,
                     maxHeight: 150,
                   }}>
-                    {goals.map((option) => (
-                      <Pressable
-                        key={option}
-                        onPress={() => {
-                          setGoal(option);
-                          setShowGoalDropdown(false);
-                        }}
-                        style={{
-                          padding: theme.spacing.sm,
-                          borderBottomWidth: 1,
-                          borderBottomColor: theme.colors.border,
-                        }}
-                      >
-                        <Text style={{ 
-                          color: goal === option ? theme.colors.primary : theme.colors.text, 
-                          ...theme.typography.body,
-                          fontWeight: goal === option ? "600" : "400"
-                        }}>
-                          {option}
-                        </Text>
-                      </Pressable>
-                    ))}
+                    <ScrollView 
+                      style={{ maxHeight: 150 }}
+                      showsVerticalScrollIndicator={true}
+                      nestedScrollEnabled={true}
+                    >
+                      {goals.map((option) => (
+                        <Pressable
+                          key={option}
+                          onPress={() => {
+                            setGoal(option);
+                            setShowGoalDropdown(false);
+                          }}
+                          style={{
+                            padding: theme.spacing.sm,
+                            borderBottomWidth: 1,
+                            borderBottomColor: theme.colors.border,
+                          }}
+                        >
+                          <Text style={{ 
+                            color: goal === option ? theme.colors.primary : theme.colors.text, 
+                            ...theme.typography.body,
+                            fontWeight: goal === option ? "600" : "400"
+                          }}>
+                            {option}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
                   </View>
                 )}
               </View>
@@ -1599,28 +1605,34 @@ export default function Profile() {
                     marginTop: theme.spacing.xs,
                     maxHeight: 150,
                   }}>
-                    {sessionsOptions.map((option) => (
-                      <Pressable
-                        key={option}
-                        onPress={() => {
-                          setSessions(option.toString());
-                          setShowSessionsDropdown(false);
-                        }}
-                        style={{
-                          padding: theme.spacing.sm,
-                          borderBottomWidth: 1,
-                          borderBottomColor: theme.colors.border,
-                        }}
-                      >
-                        <Text style={{ 
-                          color: sessions === option.toString() ? theme.colors.primary : theme.colors.text, 
-                          ...theme.typography.body,
-                          fontWeight: sessions === option.toString() ? "600" : "400"
-                        }}>
-                          {option}
-                        </Text>
-                      </Pressable>
-                    ))}
+                    <ScrollView 
+                      style={{ maxHeight: 150 }}
+                      showsVerticalScrollIndicator={true}
+                      nestedScrollEnabled={true}
+                    >
+                      {sessionsOptions.map((option) => (
+                        <Pressable
+                          key={option}
+                          onPress={() => {
+                            setSessions(option.toString());
+                            setShowSessionsDropdown(false);
+                          }}
+                          style={{
+                            padding: theme.spacing.sm,
+                            borderBottomWidth: 1,
+                            borderBottomColor: theme.colors.border,
+                          }}
+                        >
+                          <Text style={{ 
+                            color: sessions === option.toString() ? theme.colors.primary : theme.colors.text, 
+                            ...theme.typography.body,
+                            fontWeight: sessions === option.toString() ? "600" : "400"
+                          }}>
+                            {option}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
                   </View>
                 )}
               </View>
@@ -1673,28 +1685,34 @@ export default function Profile() {
                     marginTop: theme.spacing.xs,
                     maxHeight: 150,
                   }}>
-                    {diets.map((option) => (
-                      <Pressable
-                        key={option}
-                        onPress={() => {
-                          setDiet(option);
-                          setShowDietDropdown(false);
-                        }}
-                        style={{
-                          padding: theme.spacing.sm,
-                          borderBottomWidth: 1,
-                          borderBottomColor: theme.colors.border,
-                        }}
-                      >
-                        <Text style={{ 
-                          color: diet === option ? theme.colors.primary : theme.colors.text, 
-                          ...theme.typography.body,
-                          fontWeight: diet === option ? "600" : "400"
-                        }}>
-                          {option}
-                        </Text>
-                      </Pressable>
-                    ))}
+                    <ScrollView 
+                      style={{ maxHeight: 150 }}
+                      showsVerticalScrollIndicator={true}
+                      nestedScrollEnabled={true}
+                    >
+                      {diets.map((option) => (
+                        <Pressable
+                          key={option}
+                          onPress={() => {
+                            setDiet(option);
+                            setShowDietDropdown(false);
+                          }}
+                          style={{
+                            padding: theme.spacing.sm,
+                            borderBottomWidth: 1,
+                            borderBottomColor: theme.colors.border,
+                          }}
+                        >
+                          <Text style={{ 
+                            color: diet === option ? theme.colors.primary : theme.colors.text, 
+                            ...theme.typography.body,
+                            fontWeight: diet === option ? "600" : "400"
+                          }}>
+                            {option}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
                   </View>
                 )}
               </View>

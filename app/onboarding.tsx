@@ -140,8 +140,8 @@ export default function Onboarding() {
             Combien de séances par semaine ?
           </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: theme.spacing.xs }}>
-            {Array.from({ length: 5 }).map((_, i) => {
-              const val = i + 2; // 2 → 6 (suppression de l'option 7)
+            {Array.from({ length: 6 }).map((_, i) => {
+              const val = i + 1; // 1 → 6 (ajout de l'option 1, suppression de l'option 7)
               const active = sessions === val;
               return (
                 <Pressable
