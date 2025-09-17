@@ -1223,7 +1223,7 @@ export default function Profile() {
           <View>
             <Text style={{ 
               color: theme.colors.textSecondary, 
-              ...theme.typography.caption, 
+              ...theme.typography.body, 
               marginBottom: theme.spacing.xs 
             }}>
               Sexe
@@ -1266,7 +1266,7 @@ export default function Profile() {
           <View>
             <Text style={{ 
               color: theme.colors.textSecondary, 
-              ...theme.typography.caption, 
+              ...theme.typography.body, 
               marginBottom: theme.spacing.xs 
             }}>
               Prénom
@@ -1299,7 +1299,7 @@ export default function Profile() {
           <View>
             <Text style={{ 
               color: theme.colors.textSecondary, 
-              ...theme.typography.caption, 
+              ...theme.typography.body, 
               marginBottom: theme.spacing.xs 
             }}>
               Âge
@@ -1329,7 +1329,7 @@ export default function Profile() {
           <View>
             <Text style={{ 
               color: theme.colors.textSecondary, 
-              ...theme.typography.caption, 
+              ...theme.typography.body, 
               marginBottom: theme.spacing.xs 
             }}>
               Poids
@@ -1359,7 +1359,7 @@ export default function Profile() {
           <View>
             <Text style={{ 
               color: theme.colors.textSecondary, 
-              ...theme.typography.caption, 
+              ...theme.typography.body, 
               marginBottom: theme.spacing.xs 
             }}>
               Taille
@@ -1489,7 +1489,7 @@ export default function Profile() {
           <View>
             <Text style={{ 
               color: theme.colors.textSecondary, 
-              ...theme.typography.caption, 
+              ...theme.typography.body, 
               marginBottom: theme.spacing.xs 
             }}>Objectif</Text>
             {isEditingPreferences ? (
@@ -1553,8 +1553,7 @@ export default function Profile() {
             ) : (
               <Text style={{ 
                 color: theme.colors.text, 
-                ...theme.typography.body, 
-                fontWeight: "600" 
+                ...theme.typography.body
               }}>
                 {profile?.goal || "Non défini"}
               </Text>
@@ -1564,7 +1563,7 @@ export default function Profile() {
           <View>
             <Text style={{ 
               color: theme.colors.textSecondary, 
-              ...theme.typography.caption, 
+              ...theme.typography.body, 
               marginBottom: theme.spacing.xs 
             }}>Séances/semaine</Text>
             {isEditingPreferences ? (
@@ -1628,8 +1627,7 @@ export default function Profile() {
             ) : (
               <Text style={{ 
                 color: theme.colors.text, 
-                ...theme.typography.body, 
-                fontWeight: "600" 
+                ...theme.typography.body
               }}>
                 {profile?.sessions || 0}
               </Text>
@@ -1639,7 +1637,7 @@ export default function Profile() {
           <View>
             <Text style={{ 
               color: theme.colors.textSecondary, 
-              ...theme.typography.caption, 
+              ...theme.typography.body, 
               marginBottom: theme.spacing.xs 
             }}>Régime alimentaire</Text>
             {isEditingPreferences ? (
@@ -1703,8 +1701,7 @@ export default function Profile() {
             ) : (
               <Text style={{ 
                 color: theme.colors.text, 
-                ...theme.typography.body, 
-                fontWeight: "600" 
+                ...theme.typography.body
               }}>
                 {profile?.diet || "Non défini"}
               </Text>
@@ -1714,7 +1711,7 @@ export default function Profile() {
           <View>
             <Text style={{ 
               color: theme.colors.textSecondary, 
-              ...theme.typography.caption, 
+              ...theme.typography.body, 
               marginBottom: theme.spacing.xs 
             }}>Niveau de sport</Text>
             {isEditingPreferences ? (
@@ -1730,8 +1727,7 @@ export default function Profile() {
             ) : (
               <Text style={{ 
                 color: theme.colors.text, 
-                ...theme.typography.body, 
-                fontWeight: "600" 
+                ...theme.typography.body
               }}>
                 {profile?.chat_responses?.fitnessLevel || profile?.fitness_level || "Non défini"}
               </Text>
@@ -1741,7 +1737,7 @@ export default function Profile() {
           <View>
             <Text style={{ 
               color: theme.colors.textSecondary, 
-              ...theme.typography.caption, 
+              ...theme.typography.body, 
               marginBottom: theme.spacing.xs 
             }}>Matériel</Text>
             {isEditingPreferences ? (
@@ -1757,8 +1753,7 @@ export default function Profile() {
             ) : (
               <Text style={{ 
                 color: theme.colors.text, 
-                ...theme.typography.body, 
-                fontWeight: "600" 
+                ...theme.typography.body
               }}>
                 {profile?.chat_responses?.equipment || profile?.equipment || "Non défini"}
               </Text>
@@ -1768,7 +1763,7 @@ export default function Profile() {
           <View>
             <Text style={{ 
               color: theme.colors.textSecondary, 
-              ...theme.typography.caption, 
+              ...theme.typography.body, 
               marginBottom: theme.spacing.xs 
             }}>Intolérances</Text>
             {isEditingPreferences ? (
@@ -1784,8 +1779,7 @@ export default function Profile() {
             ) : (
               <Text style={{ 
                 color: theme.colors.text, 
-                ...theme.typography.body, 
-                fontWeight: "600" 
+                ...theme.typography.body
               }}>
                 {profile?.chat_responses?.intolerances || profile?.intolerances || "Non défini"}
               </Text>
@@ -1795,7 +1789,7 @@ export default function Profile() {
           <View>
             <Text style={{ 
               color: theme.colors.textSecondary, 
-              ...theme.typography.caption, 
+              ...theme.typography.body, 
               marginBottom: theme.spacing.xs 
             }}>Limitations</Text>
             {isEditingPreferences ? (
@@ -1811,8 +1805,7 @@ export default function Profile() {
             ) : (
               <Text style={{ 
                 color: theme.colors.text, 
-                ...theme.typography.body, 
-                fontWeight: "600" 
+                ...theme.typography.body
               }}>
                 {profile?.chat_responses?.limitations || profile?.limitations || "Non défini"}
               </Text>
@@ -1822,7 +1815,7 @@ export default function Profile() {
           <View>
             <Text style={{ 
               color: theme.colors.textSecondary, 
-              ...theme.typography.caption, 
+              ...theme.typography.body, 
               marginBottom: theme.spacing.xs 
             }}>Horaires préférés</Text>
             {isEditingPreferences ? (
@@ -1838,8 +1831,7 @@ export default function Profile() {
             ) : (
               <Text style={{ 
                 color: theme.colors.text, 
-                ...theme.typography.body, 
-                fontWeight: "600" 
+                ...theme.typography.body
               }}>
                 {profile?.chat_responses?.preferredTime || profile?.preferred_time || "Non défini"}
               </Text>

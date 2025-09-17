@@ -63,6 +63,35 @@ export default function SecuritySettingsPage() {
     setConfirmPassword("");
   };
 
+  const handleForgotPassword = async () => {
+    try {
+      const client = getSupabaseClient();
+      const { data: { user } } = await client.auth.getUser();
+      
+      if (!user?.email) {
+        Alert.alert('Erreur', 'Aucun email associé à ce compte');
+        return;
+      }
+
+      const { error } = await client.auth.resetPasswordForEmail(user.email, {
+        redirectTo: 'athletiq://reset-password'
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      Alert.alert(
+        'Email envoyé', 
+        'Un email de réinitialisation de mot de passe a été envoyé à votre adresse email.'
+      );
+      
+    } catch (error: any) {
+      console.error('Erreur lors de l\'envoi de l\'email:', error);
+      Alert.alert('Erreur', error.message || 'Impossible d\'envoyer l\'email de réinitialisation');
+    }
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       {/* Header */}
@@ -189,10 +218,27 @@ export default function SecuritySettingsPage() {
             color: theme.colors.textTertiary,
             ...theme.typography.caption,
             fontStyle: "italic",
-            marginBottom: theme.spacing.lg
+            marginBottom: theme.spacing.md
           }}>
             Le mot de passe doit contenir au moins 6 caractères
           </Text>
+
+          {/* Lien Mot de passe oublié */}
+          <Pressable
+            onPress={handleForgotPassword}
+            style={{
+              alignSelf: "flex-start",
+              marginBottom: theme.spacing.lg
+            }}
+          >
+            <Text style={{
+              color: theme.colors.primary,
+              ...theme.typography.caption,
+              textDecorationLine: "underline"
+            }}>
+              Mot de passe oublié ?
+            </Text>
+          </Pressable>
 
           {/* Boutons d'action */}
           <View style={{

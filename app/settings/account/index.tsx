@@ -156,7 +156,7 @@ export default function AccountSettings() {
       console.log('Redirection vers la page de connexion...');
       router.replace('/');
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur lors de la déconnexion:', error);
       Alert.alert(
         'Erreur',
@@ -299,10 +299,6 @@ export default function AccountSettings() {
               alignItems: "center",
               marginRight: theme.spacing.sm,
             }}>
-              <Text style={{ 
-                color: theme.colors.primary, 
-                fontSize: 18 
-              }}>👤</Text>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ 
@@ -346,10 +342,6 @@ export default function AccountSettings() {
               alignItems: "center",
               marginRight: theme.spacing.sm,
             }}>
-              <Text style={{ 
-                color: theme.colors.primary, 
-                fontSize: 18 
-              }}>🔐</Text>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ 
@@ -393,10 +385,6 @@ export default function AccountSettings() {
               alignItems: "center",
               marginRight: theme.spacing.sm,
             }}>
-              <Text style={{ 
-                color: theme.colors.primary, 
-                fontSize: 18 
-              }}>🔒</Text>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ 
@@ -440,10 +428,6 @@ export default function AccountSettings() {
               alignItems: "center",
               marginRight: theme.spacing.sm,
             }}>
-              <Text style={{ 
-                color: theme.colors.primary, 
-                fontSize: 18 
-              }}>❓</Text>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ 
@@ -483,10 +467,6 @@ export default function AccountSettings() {
               alignItems: "center",
               marginRight: theme.spacing.sm,
             }}>
-              <Text style={{ 
-                color: theme.colors.textSecondary, 
-                fontSize: 18 
-              }}>🚪</Text>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ 

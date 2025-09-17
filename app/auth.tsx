@@ -13,6 +13,7 @@ import {
     View,
 } from 'react-native';
 import { authService, AuthState } from '../lib/auth';
+import { getSupabaseClient } from '../lib/supabase';
 
 export default function AuthScreen() {
   const router = useRouter();
@@ -86,6 +87,34 @@ export default function AuthScreen() {
       Alert.alert('Erreur', 'Une erreur est survenue');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      Alert.alert('Erreur', 'Veuillez d\'abord saisir votre adresse email');
+      return;
+    }
+
+    try {
+      const client = getSupabaseClient();
+      
+      const { error } = await client.auth.resetPasswordForEmail(email, {
+        redirectTo: 'athletiq://reset-password'
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      Alert.alert(
+        'Email envoyé', 
+        'Un email de réinitialisation de mot de passe a été envoyé à votre adresse email.'
+      );
+      
+    } catch (error: any) {
+      console.error('Erreur lors de l\'envoi de l\'email:', error);
+      Alert.alert('Erreur', error.message || 'Impossible d\'envoyer l\'email de réinitialisation');
     }
   };
 
@@ -169,6 +198,18 @@ export default function AuthScreen() {
                 </Text>
               )}
             </Pressable>
+
+            {/* Lien Mot de passe oublié - seulement en mode connexion */}
+            {!isSignUp && (
+              <Pressable
+                onPress={handleForgotPassword}
+                style={styles.forgotPasswordContainer}
+              >
+                <Text style={styles.forgotPasswordText}>
+                  Mot de passe oublié ?
+                </Text>
+              </Pressable>
+            )}
 
             {/* Toggle Sign Up/Sign In */}
             <View style={styles.toggleContainer}>
@@ -306,6 +347,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     lineHeight: 16,
+  },
+  forgotPasswordContainer: {
+    alignSelf: 'flex-end',
+    marginTop: 12,
+  },
+  forgotPasswordText: {
+    color: '#007AFF',
+    fontSize: 14,
+    fontWeight: '500',
+    textDecorationLine: 'underline',
   },
 });
 

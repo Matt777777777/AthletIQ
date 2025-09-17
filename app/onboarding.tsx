@@ -20,9 +20,19 @@ export default function Onboarding() {
   const [weight, setWeight] = useState<string>("");
   const [height, setHeight] = useState<string>("");
 
+  // Fonction pour vérifier si tous les champs obligatoires sont remplis
+  const isStep4Complete = () => {
+    return gender && firstName.trim() && age.trim() && weight.trim() && height.trim();
+  };
+
   async function next() {
     if (step < 4) {
       setStep((s) => (s + 1) as 1 | 2 | 3 | 4);
+      return;
+    }
+
+    // Vérifier que tous les champs obligatoires sont remplis à l'étape 4
+    if (!isStep4Complete()) {
       return;
     }
 
@@ -32,10 +42,10 @@ export default function Onboarding() {
       sessions,
       diet: diet ?? "Aucune restriction",
       gender: gender === "Homme" ? "male" as const : gender === "Femme" ? "female" as const : undefined,
-      first_name: firstName.trim() || undefined,
-      age: age ? parseInt(age) : undefined,
-      weight: weight ? parseFloat(weight) : undefined,
-      height: height ? parseFloat(height) : undefined,
+      first_name: firstName.trim(),
+      age: parseInt(age),
+      weight: parseFloat(weight),
+      height: parseFloat(height),
       profile_photo: '',
       fitness_level: 'débutant',
       equipment: 'aucun',
@@ -205,7 +215,7 @@ export default function Onboarding() {
                 ...theme.typography.body, 
                 marginBottom: theme.spacing.xs 
               }}>
-                Ton sexe
+                Ton sexe <Text style={{ color: theme.colors.primary }}>*</Text>
               </Text>
               <View style={{ 
                 flexDirection: "row", 
@@ -240,7 +250,7 @@ export default function Onboarding() {
                 ...theme.typography.body, 
                 marginBottom: theme.spacing.xs 
               }}>
-                Ton prénom
+                Ton prénom <Text style={{ color: theme.colors.primary }}>*</Text>
               </Text>
               <TextInput
                 value={firstName}
@@ -259,7 +269,7 @@ export default function Onboarding() {
                 ...theme.typography.body, 
                 marginBottom: theme.spacing.xs 
               }}>
-                Ton âge
+                Ton âge <Text style={{ color: theme.colors.primary }}>*</Text>
               </Text>
               <TextInput
                 value={age}
@@ -279,7 +289,7 @@ export default function Onboarding() {
                 ...theme.typography.body, 
                 marginBottom: theme.spacing.xs 
               }}>
-                Ton poids (kg)
+                Ton poids (kg) <Text style={{ color: theme.colors.primary }}>*</Text>
               </Text>
               <TextInput
                 value={weight}
@@ -299,7 +309,7 @@ export default function Onboarding() {
                 ...theme.typography.body, 
                 marginBottom: theme.spacing.xs 
               }}>
-                Ta taille (cm)
+                Ta taille (cm) <Text style={{ color: theme.colors.primary }}>*</Text>
               </Text>
               <TextInput
                 value={height}
@@ -330,10 +340,12 @@ export default function Onboarding() {
         <View style={{ paddingVertical: theme.spacing.lg }}>
         <Pressable
           onPress={next}
-          disabled={(step === 1 && !goal) || (step === 3 && !diet)}
+          disabled={(step === 1 && !goal) || (step === 3 && !diet) || (step === 4 && !isStep4Complete())}
           style={{
             backgroundColor:
-              (step === 1 && !goal) || (step === 3 && !diet) ? theme.colors.surface : theme.colors.primary,
+              (step === 1 && !goal) || (step === 3 && !diet) || (step === 4 && !isStep4Complete()) 
+                ? theme.colors.surface 
+                : theme.colors.primary,
             paddingVertical: theme.spacing.md,
             borderRadius: theme.borderRadius.lg,
             alignItems: "center",
