@@ -61,17 +61,18 @@ export default function Onboarding() {
     try {
       const result = await authService.updateProfile(profile);
       if (result.success) {
+        console.log("Profil mis à jour avec succès, redirection automatique...");
         // La redirection se fera automatiquement via le layout principal
-        router.replace("/(tabs)");
+        // Pas besoin de redirection manuelle ici
       } else {
         console.error("Erreur mise à jour profil:", result.error);
-        // Fallback : essayer de sauvegarder en local
-        router.replace("/(tabs)");
+        // En cas d'erreur, on peut essayer de continuer quand même
+        // Le système de navigation gérera la suite
       }
     } catch (e) {
       console.warn("Erreur updateProfile:", e);
-      // Fallback : continuer quand même
-      router.replace("/(tabs)");
+      // En cas d'erreur, on peut essayer de continuer quand même
+      // Le système de navigation gérera la suite
     }
   }
 

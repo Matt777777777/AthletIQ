@@ -2,8 +2,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, Image, Pressable, ScrollView, Text, View } from "react-native";
+import { authService } from "../../../lib/auth";
 import { loadProfile, saveProfile, UserProfile } from "../../../lib/profile";
-import { getSupabaseClient } from "../../../lib/supabase";
 import { theme } from "../../../theme";
 
 export default function AccountSettings() {
@@ -140,21 +140,13 @@ export default function AccountSettings() {
     try {
       console.log('Début de la déconnexion...');
       
-      const client = getSupabaseClient();
-      console.log('Client Supabase récupéré');
+      // Utiliser le service d'authentification pour une déconnexion propre
+      await authService.signOut();
       
-      const { error } = await client.auth.signOut();
+      console.log('Déconnexion réussie');
       
-      if (error) {
-        console.error('Erreur Supabase lors de la déconnexion:', error);
-        throw error;
-      }
-      
-      console.log('Déconnexion Supabase réussie');
-      
-      // Rediriger vers la page de connexion
-      console.log('Redirection vers la page de connexion...');
-      router.replace('/');
+      // Le système de navigation automatique dans _layout.tsx va gérer la redirection
+      // Pas besoin de redirection manuelle ici
       
     } catch (error: any) {
       console.error('Erreur lors de la déconnexion:', error);

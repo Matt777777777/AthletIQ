@@ -12,6 +12,7 @@ import {
     View
 } from "react-native";
 import { authService } from "../../lib/auth";
+import { loadDailyIntake, saveDailyIntake } from "../../lib/nutrition";
 import { deletePlan, deleteProfile, loadProfile, saveProfile, UserProfile } from "../../lib/profile";
 import { theme } from "../../theme";
 
@@ -315,6 +316,10 @@ export default function Profile() {
   } | null>(null);
   const [showPlanDetail, setShowPlanDetail] = useState(false);
   
+  // États pour les repas cochés
+  const [eatenMeals, setEatenMeals] = useState<Set<string>>(new Set());
+  const [dailyIntake, setDailyIntake] = useState({ kcal: 0 });
+  
   // États pour les informations de compte
   const [profileImage, setProfileImage] = useState<string | null>(null);
 
@@ -344,6 +349,8 @@ export default function Profile() {
   useFocusEffect(
     useCallback(() => {
       loadUserProfile();
+      loadDailyNutrition();
+      loadEatenMeals();
     }, [])
   );
 
@@ -376,6 +383,132 @@ export default function Profile() {
       }
     } catch (error) {
       console.error("Erreur lors du chargement du profil:", error);
+    }
+  };
+
+  // Fonction pour charger l'apport nutritionnel quotidien
+  const loadDailyNutrition = async () => {
+    try {
+      const intake = await loadDailyIntake();
+      setDailyIntake(intake);
+    } catch (error) {
+      console.error("Erreur lors du chargement de l'apport nutritionnel:", error);
+    }
+  };
+
+  // Fonction pour charger l'état des repas cochés depuis le profil
+  const loadEatenMeals = async () => {
+    try {
+      const profileData = await loadProfile();
+      if (profileData?.daily_meals) {
+        const eatenMealIds = new Set<string>();
+        
+        // Vérifier tous les repas du jour qui sont marqués comme mangés
+        Object.values(profileData.daily_meals).forEach(meal => {
+          if (meal && meal.eaten) {
+            eatenMealIds.add(meal.id);
+          }
+        });
+        
+        setEatenMeals(eatenMealIds);
+        console.log('Repas cochés chargés:', Array.from(eatenMealIds));
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement des repas cochés:", error);
+    }
+  };
+
+  // Fonction pour calculer les calories d'un repas
+  const calculateMealCalories = (content: string): number => {
+    // Extraire les calories du contenu du repas
+    const calorieMatch = content.match(/Calories estimées:\s*(\d+)\s*kcal/);
+    if (calorieMatch) {
+      return parseInt(calorieMatch[1]);
+    }
+    
+    // Fallback: estimation basique basée sur le contenu
+    const lowerContent = content.toLowerCase();
+    let estimatedCalories = 300; // Base
+    
+    if (lowerContent.includes('petit') && lowerContent.includes('déjeuner')) {
+      estimatedCalories = 400;
+    } else if (lowerContent.includes('déjeuner')) {
+      estimatedCalories = 600;
+    } else if (lowerContent.includes('dîner')) {
+      estimatedCalories = 500;
+    } else if (lowerContent.includes('collation') || lowerContent.includes('snack')) {
+      estimatedCalories = 200;
+    }
+    
+    return estimatedCalories;
+  };
+
+  // Fonction pour cocher/décocher un repas
+  const toggleMealEaten = async (mealId: string, mealContent: string) => {
+    const isEaten = eatenMeals.has(mealId);
+    
+    try {
+      if (isEaten) {
+        // Décocher le repas
+        setEatenMeals(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(mealId);
+          return newSet;
+        });
+      } else {
+        // Cocher le repas
+        setEatenMeals(prev => new Set(prev).add(mealId));
+      }
+      
+      // Recalculer les valeurs nutritionnelles à partir de tous les repas cochés
+      const newEatenMeals = isEaten ? 
+        Array.from(eatenMeals).filter(id => id !== mealId) : 
+        Array.from(eatenMeals).concat(mealId);
+      
+      let totalCalories = 0;
+      for (const mealId of newEatenMeals) {
+        const meal = profile?.saved_plans?.meals?.find(m => m.id === mealId);
+        if (meal) {
+          const mealCalories = calculateMealCalories(meal.content);
+          totalCalories += mealCalories;
+        }
+      }
+      
+      setDailyIntake({ kcal: totalCalories });
+      await saveDailyIntake({ kcal: totalCalories });
+      
+      // Sauvegarder l'état des repas cochés dans le profil
+      try {
+        const profileData = await loadProfile();
+        if (profileData) {
+          const updatedProfile = {
+            ...profileData,
+            daily_meals: {
+              ...profileData.daily_meals,
+              // Mettre à jour le repas correspondant dans daily_meals
+              ...(profileData.daily_meals ? Object.keys(profileData.daily_meals).reduce((acc, mealType) => {
+                const meal = profileData.daily_meals![mealType as keyof typeof profileData.daily_meals];
+                if (meal && meal.id === mealId) {
+                  acc[mealType as keyof typeof profileData.daily_meals] = {
+                    ...meal,
+                    eaten: !isEaten
+                  };
+                }
+                return acc;
+              }, {} as any) : {})
+            }
+          };
+          
+          await saveProfile(updatedProfile);
+          console.log('État des repas sauvegardé dans le profil');
+        }
+      } catch (error) {
+        console.error('Erreur lors de la sauvegarde de l\'état des repas:', error);
+      }
+      
+      console.log(`Repas ${isEaten ? 'décroché' : 'coché'}: ${totalCalories} kcal total`);
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour des calories:", error);
     }
   };
 
@@ -805,68 +938,27 @@ export default function Profile() {
                     borderLeftColor: theme.colors.primary
                   }}
                 >
-                  <Text style={{ 
-                    color: theme.colors.text, 
-                    ...theme.typography.body 
-                  }}>
-                    {workout.title}
-                  </Text>
-                  <Text style={{ 
-                    color: theme.colors.textSecondary, 
-                    ...theme.typography.caption, 
-                    marginTop: theme.spacing.xs 
-                  }}>
-                    Sauvegardé le {new Date(workout.date).toLocaleDateString('fr-FR', {
-                      day: 'numeric',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </Text>
-                  <View style={{ marginTop: theme.spacing.xs }}>
-                    {parseWorkoutContent(cleanedContent.substring(0, 200)).map((section, index) => (
-                      section.type === 'title' ? (
-                        <Text key={index} style={{
-                          marginTop: section.isFirst ? 0 : theme.spacing.sm,
-                          marginBottom: theme.spacing.xs
-                        }}>
-                          <Text style={{
-                            color: theme.colors.primary,
-                            ...theme.typography.caption,
-                            fontWeight: '600'
-                          }}>
-                            {section.keyword}
-                          </Text>
-                          <Text style={{
-                            color: theme.colors.textTertiary,
-                            ...theme.typography.caption
-                          }}>
-                            {section.rest}
-                          </Text>
-                        </Text>
-                      ) : (
-                        <Text key={index} style={{
-                          color: theme.colors.textTertiary,
-                          ...theme.typography.caption,
-                          marginBottom: theme.spacing.xs
-                        }}>
-                          {section.text}
-                        </Text>
-                      )
-                    ))}
-                  </View>
                   <View style={{ 
                     flexDirection: "row", 
                     justifyContent: "space-between", 
-                    alignItems: "center", 
-                    marginTop: theme.spacing.xs 
+                    alignItems: "center"
                   }}>
-                    <Text style={{ 
-                      color: theme.colors.primary, 
-                      ...theme.typography.caption 
-                    }}>
-                      Appuyer pour voir le détail
-                    </Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ 
+                        color: theme.colors.text, 
+                        ...theme.typography.body,
+                        fontWeight: "600"
+                      }}>
+                        {workout.title}
+                      </Text>
+                      <Text style={{ 
+                        color: theme.colors.primary, 
+                        ...theme.typography.caption, 
+                        marginTop: theme.spacing.xs 
+                      }}>
+                        Appuyer pour voir le détail
+                      </Text>
+                    </View>
                     <Pressable
                       onPress={async (e) => {
                         e.stopPropagation(); // Empêcher l'ouverture de la modal
@@ -910,13 +1002,16 @@ export default function Profile() {
                         paddingVertical: theme.spacing.xs,
                         borderRadius: theme.borderRadius.sm,
                         borderWidth: 1,
-                        borderColor: theme.colors.primary
+                        borderColor: theme.colors.primary,
+                        marginLeft: theme.spacing.sm
                       }}
                     >
                       <Text style={{ 
                         color: theme.colors.primary, 
-                        ...theme.typography.caption 
-                      }}>🗑</Text>
+                        ...theme.typography.caption,
+                        fontSize: 16,
+                        fontWeight: "600"
+                      }}>✕</Text>
                     </Pressable>
                   </View>
                 </Pressable>
@@ -948,187 +1043,6 @@ export default function Profile() {
           )}
         </View>
         
-        {/* Repas sauvegardés */}
-        <View>
-          <View style={{ 
-            flexDirection: "row", 
-            justifyContent: "space-between", 
-            alignItems: "center", 
-            marginBottom: theme.spacing.xs 
-          }}>
-            <Text style={{ 
-              color: theme.colors.primary, 
-              ...theme.typography.h4 
-            }}>
-              Repas ({profile?.saved_plans?.meals?.length || 0})
-            </Text>
-            {(profile?.saved_plans?.meals?.length || 0) > 0 && (
-              <Pressable
-                onPress={deleteAllMeals}
-                style={{
-                  backgroundColor: "#2a1a1a",
-                  paddingHorizontal: theme.spacing.sm,
-                  paddingVertical: theme.spacing.xs,
-                  borderRadius: theme.borderRadius.sm,
-                  borderWidth: 1,
-                  borderColor: "#4a2a2a"
-                }}
-              >
-                <Text style={{ 
-                  color: "#ff6666", 
-                  ...theme.typography.caption 
-                }}>
-                  Tout supprimer
-                </Text>
-              </Pressable>
-            )}
-          </View>
-          {profile?.saved_plans?.meals?.length ? (
-            <ScrollView 
-              style={{ maxHeight: 200 }}
-              showsVerticalScrollIndicator={false}
-              nestedScrollEnabled={true}
-            >
-              {profile.saved_plans.meals.slice().reverse().map((meal) => {
-              const mealType = getMealType(meal.content);
-              const extractedTitle = extractMealTitle(meal.content);
-              const cleanedContent = cleanMealContent(meal.content);
-              
-              return (
-                <Pressable
-                  key={meal.id}
-                  onPress={() => openPlanDetail('meal', {
-                    ...meal,
-                    title: meal.title,
-                    content: cleanedContent
-                  })}
-                  style={{ 
-                    backgroundColor: theme.colors.surfaceElevated, 
-                    padding: theme.spacing.sm, 
-                    borderRadius: theme.borderRadius.md, 
-                    marginBottom: theme.spacing.sm,
-                    borderLeftWidth: 3,
-                    borderLeftColor: theme.colors.primary
-                  }}
-                >
-                  <Text style={{ 
-                    color: theme.colors.text, 
-                    ...theme.typography.body 
-                  }}>
-                    {meal.title}
-                  </Text>
-                  <Text style={{ 
-                    color: theme.colors.textSecondary, 
-                    ...theme.typography.caption, 
-                    marginTop: theme.spacing.xs 
-                  }}>
-                    Sauvegardé le {new Date(meal.date).toLocaleDateString('fr-FR', {
-                      day: 'numeric',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </Text>
-                  <Text style={{ 
-                    color: theme.colors.textTertiary, 
-                    ...theme.typography.caption, 
-                    marginTop: theme.spacing.xs, 
-                    fontStyle: "italic" 
-                  }}>
-                    {cleanedContent.substring(0, 100)}...
-                  </Text>
-                  <View style={{ 
-                    flexDirection: "row", 
-                    justifyContent: "space-between", 
-                    alignItems: "center", 
-                    marginTop: theme.spacing.xs 
-                  }}>
-                    <Text style={{ 
-                      color: theme.colors.primary, 
-                      ...theme.typography.caption 
-                    }}>
-                      Appuyer pour voir le détail
-                    </Text>
-                    <Pressable
-                      onPress={async (e) => {
-                        e.stopPropagation(); // Empêcher l'ouverture de la modal
-                        console.log(`Delete meal from list: ${extractedTitle}`);
-                        
-                        // Pour la simulation sur ordinateur, on peut bypasser l'Alert
-                        const isSimulator = __DEV__ && Platform.OS === 'web';
-                        
-                        if (isSimulator) {
-                          // Suppression directe en simulation
-                          console.log(`Simulator mode: deleting meal directly`);
-                          const success = await deletePlan('meal', meal.id);
-                          if (success) {
-                            loadUserProfile();
-                          }
-                          return;
-                        }
-                        
-                        Alert.alert(
-                          "Supprimer le repas",
-                          `Êtes-vous sûr de vouloir supprimer "${extractedTitle}" ?`,
-                          [
-                            { text: "Annuler", style: "cancel" },
-                            {
-                              text: "Supprimer",
-                              style: "destructive",
-                              onPress: async () => {
-                                console.log(`User confirmed deletion of meal: ${extractedTitle}`);
-                                const success = await deletePlan('meal', meal.id);
-                                if (success) {
-                                  loadUserProfile();
-                                }
-                              }
-                            }
-                          ]
-                        );
-                      }}
-                      style={{
-                        backgroundColor: theme.colors.surface,
-                        paddingHorizontal: theme.spacing.xs,
-                        paddingVertical: theme.spacing.xs,
-                        borderRadius: theme.borderRadius.sm,
-                        borderWidth: 1,
-                        borderColor: theme.colors.primary
-                      }}
-                    >
-                      <Text style={{ 
-                        color: theme.colors.primary, 
-                        ...theme.typography.caption 
-                      }}>🗑</Text>
-                    </Pressable>
-                  </View>
-                </Pressable>
-              );
-              })}
-            </ScrollView>
-          ) : (
-            <View style={{ 
-              backgroundColor: "#1a1a1a", 
-              padding: 16, 
-              borderRadius: 8,
-              alignItems: "center"
-            }}>
-              <Text style={{ 
-                color: theme.colors.textSecondary, 
-                ...theme.typography.caption,
-                fontStyle: "italic" 
-              }}>
-                Aucun repas sauvegardé
-              </Text>
-              <Text style={{ 
-                color: theme.colors.textTertiary, 
-                ...theme.typography.caption,
-                marginTop: 4 
-              }}>
-                Demande un repas dans le chat pour l'enregistrer ici
-              </Text>
-            </View>
-          )}
-        </View>
       </View>
 
       {/* Section Informations personnelles */}
@@ -2027,7 +1941,22 @@ export default function Profile() {
               
               <View>
                 {selectedPlan?.content ? (selectedPlan.type === 'workout' ? 
-                  parseWorkoutContent(selectedPlan.content) : 
+                  // Pour les séances, ne montrer que le contenu jusqu'aux calories estimées (incluses)
+                  (() => {
+                    const content = selectedPlan.content;
+                    const calorieIndex = content.indexOf('---\nCalories estimées:');
+                    if (calorieIndex !== -1) {
+                      // Trouver la fin de la ligne des calories
+                      const afterCalories = content.substring(calorieIndex + 3); // +3 pour "---"
+                      const endOfCalorieLine = afterCalories.indexOf('\n');
+                      const calorieLine = endOfCalorieLine !== -1 ? 
+                        afterCalories.substring(0, endOfCalorieLine) : 
+                        afterCalories;
+                      const workoutContent = content.substring(0, calorieIndex).trim() + '\n\n' + calorieLine;
+                      return parseWorkoutContent(workoutContent);
+                    }
+                    return parseWorkoutContent(content);
+                  })() : 
                   parseMealContent(selectedPlan.content)
                 ).map((section, index) => (
                   section.type === 'title' ? (

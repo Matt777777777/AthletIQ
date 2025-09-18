@@ -2,18 +2,91 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Link, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Alert, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import Calendar from "../components/Calendar";
 import DayDetailModal from "../components/DayDetailModal";
 import OnboardingModal from "../components/OnboardingModal";
 import { MealNutrition } from "../lib/meal-nutrition";
 import { DailyIntake, estimateKcalTarget, loadDailyIntake, saveDailyIntake } from "../lib/nutrition";
 import { latestByType, SavedPlan } from "../lib/plans";
-import { loadDailyHistory, loadProfile, saveDailyHistory, saveDailyMeal, saveProfile, UserProfile } from "../lib/profile";
+import { deletePlan, loadDailyHistory, loadProfile, saveDailyHistory, saveDailyMeal, saveProfile, UserProfile } from "../lib/profile";
 import { checkAndResetIfNewDay, checkHealthPermissions, DailySteps, getDailyStepsTarget, getStepsFromSensor, saveDailySteps } from "../lib/steps";
 import { calculateWorkoutCalories } from "../lib/workout-calories";
 import { theme } from "../theme";
 
+// Fonctions d'extraction et de nettoyage pour les repas (copiées depuis le profil)
+const extractMealTitle = (content: string): string => {
+  // Diviser le contenu en lignes et filtrer les lignes vides
+  const lines = content.split('\n').filter(line => line.trim().length > 0);
+  
+  // Si on a au moins 1 ligne, prendre la première ligne comme titre (nom du plat)
+  if (lines.length >= 1) {
+    const firstLine = lines[0].trim();
+    // Nettoyer la ligne (enlever les deux-points, etc.)
+    let cleanedTitle = firstLine.replace(/[:•\-\*]/g, '').trim();
+    
+    // Supprimer les préfixes de repas
+    cleanedTitle = cleanedTitle.replace(/^(PetitDéjeuner|Petit-déjeuner|Déjeuner|Dîner|Collation|Snack)\s*:?\s*/i, '');
+    
+    return cleanedTitle;
+  }
+
+  // Fallback: retourner un titre générique
+  return "Recette générée";
+};
+
+const cleanMealContent = (content: string): string => {
+  // Diviser le contenu en lignes et filtrer les lignes vides
+  const lines = content.split('\n').filter(line => line.trim().length > 0);
+  
+  // Si on a au moins 2 lignes, supprimer seulement la première ligne (titre)
+  if (lines.length >= 2) {
+    // Prendre toutes les lignes sauf la première (qui est le titre)
+    const contentLines = lines.slice(1);
+    return contentLines.join('\n').trim();
+  }
+  
+  // Si on a seulement une ligne, essayer de nettoyer avec les patterns
+  if (lines.length === 1) {
+    const introPatterns = [
+      /Voici une idée de [^:]+ pour [^:]+:/gi,
+      /Voici une idée de [^:]+:/gi,
+      /Voici [^:]+ pour [^:]+:/gi,
+      /Voici [^:]+:/gi,
+      /Je te propose [^:]+:/gi,
+    ];
+
+    let cleanedContent = content;
+    
+    for (const pattern of introPatterns) {
+      cleanedContent = cleanedContent.replace(pattern, '').trim();
+    }
+
+    // Nettoyer les espaces et sauts de ligne en début
+    cleanedContent = cleanedContent.replace(/^\s*\n+/, '').trim();
+    
+    return cleanedContent;
+  }
+  
+  return content;
+};
+
+// Fonction pour déterminer le type de repas basé sur le contenu
+const getMealType = (content: string): string => {
+  const lowerContent = content.toLowerCase();
+  
+  if (lowerContent.includes('petit') && lowerContent.includes('déjeuner')) {
+    return 'Petit-déj';
+  } else if (lowerContent.includes('déjeuner') || lowerContent.includes('déj')) {
+    return 'Déjeuner';
+  } else if (lowerContent.includes('dîner') || lowerContent.includes('diner')) {
+    return 'Dîner';
+  } else if (lowerContent.includes('collation') || lowerContent.includes('snack')) {
+    return 'Collation';
+  }
+  
+  return 'Repas';
+};
 
 export default function Dashboard() {
   const params = useLocalSearchParams<{ goal?: string; sessions?: string; diet?: string }>();
@@ -91,6 +164,9 @@ export default function Dashboard() {
   const [manualMealTitle, setManualMealTitle] = useState('');
   const [manualMealContent, setManualMealContent] = useState('');
   const [savedMeals, setSavedMeals] = useState<Array<{ id: string; title: string; content: string; date: string }>>([]);
+  
+  // États pour les repas cochés
+  const [eatenMeals, setEatenMeals] = useState<Set<string>>(new Set());
 
   // États pour le calendrier et l'historique
   const [showCalendar, setShowCalendar] = useState(false);
@@ -494,6 +570,9 @@ export default function Dashboard() {
         setSavedMeals(profileData.saved_plans.meals);
       }
       
+      // Charger les repas cochés
+      await loadEatenMeals();
+      
       // Vérifier et réinitialiser les données nutritionnelles si nouveau jour
       await checkAndResetNutritionIfNewDay();
 
@@ -512,6 +591,109 @@ export default function Dashboard() {
       console.error("Erreur lors du chargement des données:", error);
     }
   }, []);
+
+  // Fonctions pour gérer les repas cochés
+  const calculateMealCalories = (content: string): number => {
+    // Essayer d'extraire les calories du contenu
+    const calorieMatch = content.match(/(\d+)\s*kcal/i);
+    if (calorieMatch) {
+      return parseInt(calorieMatch[1]);
+    }
+    
+    // Estimation basée sur le contenu si pas de calories explicites
+    const lines = content.split('\n').filter(line => line.trim().length > 0);
+    let estimatedCalories = 300; // Valeur par défaut
+    
+    // Ajuster selon le type de repas détecté
+    const lowerContent = content.toLowerCase();
+    if (lowerContent.includes('petit') && lowerContent.includes('déjeuner')) {
+      estimatedCalories = 400;
+    } else if (lowerContent.includes('déjeuner')) {
+      estimatedCalories = 600;
+    } else if (lowerContent.includes('dîner')) {
+      estimatedCalories = 500;
+    } else if (lowerContent.includes('collation') || lowerContent.includes('snack')) {
+      estimatedCalories = 200;
+    }
+    
+    return estimatedCalories;
+  };
+
+
+  const loadEatenMeals = async () => {
+    try {
+      if (profile?.daily_meals) {
+        const eatenMealsSet = new Set<string>();
+        Object.entries(profile.daily_meals).forEach(([mealId, mealData]) => {
+          if (mealData?.eaten) {
+            eatenMealsSet.add(mealId);
+          }
+        });
+        setEatenMeals(eatenMealsSet);
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des repas cochés:', error);
+    }
+  };
+
+  const toggleMealEaten = async (mealId: string, mealContent: string) => {
+    try {
+      const isEaten = eatenMeals.has(mealId);
+      const newEatenMeals = new Set(eatenMeals);
+      
+      if (isEaten) {
+        newEatenMeals.delete(mealId);
+      } else {
+        newEatenMeals.add(mealId);
+      }
+      
+      setEatenMeals(newEatenMeals);
+      
+      // Recalculer les calories totales à partir des repas cochés
+      let totalCalories = 0;
+      if (profile?.saved_plans?.meals) {
+        for (const meal of profile.saved_plans.meals) {
+          if (newEatenMeals.has(meal.id)) {
+            totalCalories += calculateMealCalories(meal.content);
+          }
+        }
+      }
+      
+      // Mettre à jour les calories quotidiennes
+      const newDailyIntake = { kcal: totalCalories };
+      setDailyIntake(newDailyIntake);
+      await saveDailyIntake(newDailyIntake);
+      
+      // Mettre à jour le profil avec les repas cochés
+      if (profile) {
+        const updatedProfile = {
+          ...profile,
+          daily_meals: {
+            ...profile.daily_meals,
+            [mealId]: {
+              ...(profile.daily_meals as any)?.[mealId],
+              eaten: !isEaten
+            }
+          }
+        };
+        await saveProfile(updatedProfile);
+        setProfile(updatedProfile);
+      }
+      
+      console.log(`Repas ${isEaten ? 'décoché' : 'coché'}: ${mealId}, calories totales: ${totalCalories}`);
+    } catch (error) {
+      console.error('Erreur lors du toggle du repas:', error);
+    }
+  };
+
+  // Charger les repas cochés à chaque focus
+  useFocusEffect(
+    useCallback(() => {
+      if (profile) {
+        loadEatenMeals();
+      }
+    }, [profile])
+  );
 
   // Vérifier si c'est la première visite
   const checkFirstVisit = async () => {
@@ -1035,61 +1217,6 @@ export default function Dashboard() {
     setShowWorkoutModal(true);
   };
 
-  // Fonction pour basculer l'état "eaten" d'un repas
-  const toggleMealEaten = async (mealType: 'breakfast' | 'lunch' | 'snack' | 'dinner') => {
-    if (!dailyMeals[mealType]) return;
-
-    const meal = dailyMeals[mealType]!;
-    const wasEaten = meal.eaten;
-    const newEatenState = !wasEaten;
-
-    const updatedMeals = {
-      ...dailyMeals,
-      [mealType]: {
-        ...meal,
-        eaten: newEatenState
-      }
-    };
-
-    setDailyMeals(updatedMeals);
-
-    // Utiliser les calories stockées dans le repas si disponibles, sinon les calculer
-    const mealNutrition = meal.nutrition || estimateMealNutrition(meal.content, mealType);
-    
-    // Recalculer les valeurs nutritionnelles basées sur tous les repas mangés
-    const nutritionFromMeals = recalculateNutritionFromMeals(updatedMeals);
-    setDailyIntake({ kcal: nutritionFromMeals.calories });
-    setMacronutrients({ 
-      carbs: nutritionFromMeals.carbs, 
-      protein: nutritionFromMeals.protein, 
-      fat: nutritionFromMeals.fat 
-    });
-
-    // Sauvegarder les nouvelles valeurs
-    await saveDailyIntake({ kcal: nutritionFromMeals.calories });
-    
-    if (newEatenState) {
-      console.log(`Repas ${mealType} mangé: +${mealNutrition.calories} kcal, +${mealNutrition.carbs}g glucides, +${mealNutrition.protein}g protéines, +${mealNutrition.fat}g graisses`);
-    } else {
-      console.log(`Repas ${mealType} non mangé: -${mealNutrition.calories} kcal, -${mealNutrition.carbs}g glucides, -${mealNutrition.protein}g protéines, -${mealNutrition.fat}g graisses`);
-    }
-    console.log(`Valeurs nutritionnelles totales: ${nutritionFromMeals.calories} kcal, ${nutritionFromMeals.carbs}g glucides, ${nutritionFromMeals.protein}g protéines, ${nutritionFromMeals.fat}g graisses`);
-
-    // Sauvegarder l'état des repas dans AsyncStorage
-    try {
-      const profileData = await loadProfile();
-      if (profileData) {
-        const updatedProfile = {
-          ...profileData,
-          dailyMeals: updatedMeals
-        };
-        await AsyncStorage.setItem('userProfile', JSON.stringify(updatedProfile));
-        console.log(`Repas ${mealType} marqué comme ${newEatenState ? 'mangé' : 'non mangé'}`);
-      }
-    } catch (error) {
-      console.error('Erreur sauvegarde repas:', error);
-    }
-  };
 
   const goal = profile?.goal || params.goal || "Objectif général";
   const sessions = profile?.sessions || Number(params.sessions || 4);
@@ -1612,271 +1739,174 @@ export default function Dashboard() {
           Repas du jour
         </Text>
         
-        <View style={{ gap: theme.spacing.md }}>
-          {/* Petit-déjeuner */}
-          <View style={{ 
-            flexDirection: "row", 
-            alignItems: "center",
-            paddingVertical: theme.spacing.sm,
-          }}>
-            {/* Case à cocher élégante */}
-            <Pressable
-              onPress={() => dailyMeals.breakfast && toggleMealEaten('breakfast')}
-              disabled={!dailyMeals.breakfast}
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: 6,
-                borderWidth: 2,
-                borderColor: dailyMeals.breakfast ? 
-                  (dailyMeals.breakfast.eaten ? theme.colors.success : theme.colors.border) : 
-                  theme.colors.border,
-                backgroundColor: dailyMeals.breakfast?.eaten ? theme.colors.success : theme.colors.surfaceElevated,
-                marginRight: theme.spacing.md,
-                justifyContent: "center",
-                alignItems: "center",
-                opacity: dailyMeals.breakfast ? 1 : 0.4,
-              }}
-            >
-              {dailyMeals.breakfast?.eaten && (
-                <Text style={{ 
-                  color: theme.colors.background, 
-                  fontSize: 14, 
-                  fontWeight: "700" 
-                }}>✓</Text>
-              )}
-            </Pressable>
-            
-            <Pressable 
-              style={{ flex: 1 }}
-              onPress={() => {
-                if (dailyMeals.breakfast) {
-                  setSelectedMeal(dailyMeals.breakfast);
-                  setShowMealModal(true);
-                }
-              }}
-            >
-              <Text style={{ 
-                color: theme.colors.primary, 
-                ...theme.typography.label,
-                marginBottom: 2
-              }}>
-                Petit-déjeuner
-              </Text>
-              <Text style={{ 
-                color: dailyMeals.breakfast ? 
-                  (dailyMeals.breakfast.eaten ? theme.colors.success : theme.colors.text) : 
-                  theme.colors.textTertiary, 
-                ...theme.typography.bodySmall,
-                textDecorationLine: dailyMeals.breakfast?.eaten ? "line-through" : "none"
-              }}>
-                {dailyMeals.breakfast ? dailyMeals.breakfast.title : "Pas encore planifié"}
-              </Text>
-            </Pressable>
-          </View>
-
-          {/* Déjeuner */}
-          <View style={{ 
-            flexDirection: "row", 
-            alignItems: "center",
-            paddingVertical: theme.spacing.sm,
-          }}>
-            <Pressable
-              onPress={() => dailyMeals.lunch && toggleMealEaten('lunch')}
-              disabled={!dailyMeals.lunch}
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: 6,
-                borderWidth: 2,
-                borderColor: dailyMeals.lunch ? 
-                  (dailyMeals.lunch.eaten ? theme.colors.success : theme.colors.border) : 
-                  theme.colors.border,
-                backgroundColor: dailyMeals.lunch?.eaten ? theme.colors.success : theme.colors.surfaceElevated,
-                marginRight: theme.spacing.md,
-                justifyContent: "center",
-                alignItems: "center",
-                opacity: dailyMeals.lunch ? 1 : 0.4,
-              }}
-            >
-              {dailyMeals.lunch?.eaten && (
-                <Text style={{ 
-                  color: theme.colors.background, 
-                  fontSize: 14, 
-                  fontWeight: "700" 
-                }}>✓</Text>
-              )}
-            </Pressable>
-            
-            <Pressable 
-              style={{ flex: 1 }}
-              onPress={() => {
-                if (dailyMeals.lunch) {
-                  setSelectedMeal(dailyMeals.lunch);
-                  setShowMealModal(true);
-                }
-              }}
-            >
-              <Text style={{ 
-                color: theme.colors.primary, 
-                ...theme.typography.label,
-                marginBottom: 2
-              }}>
-                Déjeuner
-              </Text>
-              <Text style={{ 
-                color: dailyMeals.lunch ? 
-                  (dailyMeals.lunch.eaten ? theme.colors.success : theme.colors.text) : 
-                  theme.colors.textTertiary, 
-                ...theme.typography.bodySmall,
-                textDecorationLine: dailyMeals.lunch?.eaten ? "line-through" : "none"
-              }}>
-                {dailyMeals.lunch ? dailyMeals.lunch.title : "Pas encore planifié"}
-              </Text>
-            </Pressable>
-          </View>
-
-          {/* Collation */}
-          <View style={{ 
-            flexDirection: "row", 
-            alignItems: "center",
-            paddingVertical: theme.spacing.sm,
-          }}>
-            <Pressable
-              onPress={() => dailyMeals.snack && toggleMealEaten('snack')}
-              disabled={!dailyMeals.snack}
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: 6,
-                borderWidth: 2,
-                borderColor: dailyMeals.snack ? 
-                  (dailyMeals.snack.eaten ? theme.colors.success : theme.colors.border) : 
-                  theme.colors.border,
-                backgroundColor: dailyMeals.snack?.eaten ? theme.colors.success : theme.colors.surfaceElevated,
-                marginRight: theme.spacing.md,
-                justifyContent: "center",
-                alignItems: "center",
-                opacity: dailyMeals.snack ? 1 : 0.4,
-              }}
-            >
-              {dailyMeals.snack?.eaten && (
-                <Text style={{ 
-                  color: theme.colors.background, 
-                  fontSize: 14, 
-                  fontWeight: "700" 
-                }}>✓</Text>
-              )}
-            </Pressable>
-            
-            <Pressable
-              style={{ flex: 1 }}
-              onPress={() => {
-                if (dailyMeals.snack) {
-                  setSelectedMeal(dailyMeals.snack);
-                  setShowMealModal(true);
-                }
-              }}
-            >
-              <Text style={{ 
-                color: theme.colors.primary, 
-                ...theme.typography.label,
-                marginBottom: 2
-              }}>
-                Collation
-              </Text>
-              <Text style={{ 
-                color: dailyMeals.snack ? 
-                  (dailyMeals.snack.eaten ? theme.colors.success : theme.colors.text) : 
-                  theme.colors.textTertiary, 
-                ...theme.typography.bodySmall,
-                textDecorationLine: dailyMeals.snack?.eaten ? "line-through" : "none"
-              }}>
-                {dailyMeals.snack ? dailyMeals.snack.title : "Pas encore planifié"}
-              </Text>
-            </Pressable>
-          </View>
-
-          {/* Dîner */}
-          <View style={{ 
-            flexDirection: "row", 
-            alignItems: "center",
-            paddingVertical: theme.spacing.sm,
-          }}>
-            <Pressable
-              onPress={() => dailyMeals.dinner && toggleMealEaten('dinner')}
-              disabled={!dailyMeals.dinner}
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: 6,
-                borderWidth: 2,
-                borderColor: dailyMeals.dinner ? 
-                  (dailyMeals.dinner.eaten ? theme.colors.success : theme.colors.border) : 
-                  theme.colors.border,
-                backgroundColor: dailyMeals.dinner?.eaten ? theme.colors.success : theme.colors.surfaceElevated,
-                marginRight: theme.spacing.md,
-                justifyContent: "center",
-                alignItems: "center",
-                opacity: dailyMeals.dinner ? 1 : 0.4,
-              }}
-            >
-              {dailyMeals.dinner?.eaten && (
-                <Text style={{ 
-                  color: theme.colors.background, 
-                  fontSize: 14, 
-                  fontWeight: "700" 
-                }}>✓</Text>
-              )}
-            </Pressable>
-            
-            <Pressable 
-              style={{ flex: 1 }}
-              onPress={() => {
-                if (dailyMeals.dinner) {
-                  setSelectedMeal(dailyMeals.dinner);
-                  setShowMealModal(true);
-                }
-              }}
-            >
-              <Text style={{ 
-                color: theme.colors.primary, 
-                ...theme.typography.label,
-                marginBottom: 2
-              }}>
-                Dîner
-              </Text>
-              <Text style={{ 
-                color: dailyMeals.dinner ? 
-                  (dailyMeals.dinner.eaten ? theme.colors.success : theme.colors.text) : 
-                  theme.colors.textTertiary, 
-                ...theme.typography.bodySmall,
-                textDecorationLine: dailyMeals.dinner?.eaten ? "line-through" : "none"
-              }}>
-                {dailyMeals.dinner ? dailyMeals.dinner.title : "Pas encore planifié"}
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Bouton d'ajout de repas - Style similaire au bouton sport */}
-        <View style={{ 
-          marginTop: theme.spacing.lg 
-        }}>
-          <Pressable
-            onPress={handleAddMealClick}
-            style={{
-              ...theme.button.secondary,
-            }}
+        {/* Liste des repas enregistrés */}
+        {profile?.saved_plans?.meals?.length ? (
+          <ScrollView 
+            style={{ maxHeight: 200 }}
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
           >
+            {profile.saved_plans.meals.slice().reverse().map((meal) => {
+              const mealType = getMealType(meal.content);
+              const extractedTitle = extractMealTitle(meal.content);
+              const cleanedContent = cleanMealContent(meal.content);
+              
+              return (
+                <Pressable
+                  key={meal.id}
+                  onPress={() => {
+                    setSelectedMeal({
+                      id: meal.id,
+                      title: meal.title,
+                      content: cleanedContent,
+                      date: meal.date
+                    });
+                    setShowMealModal(true);
+                  }}
+                  style={{ 
+                    backgroundColor: theme.colors.surfaceElevated, 
+                    padding: theme.spacing.sm, 
+                    borderRadius: theme.borderRadius.md, 
+                    marginBottom: theme.spacing.sm,
+                    borderLeftWidth: 3,
+                    borderLeftColor: theme.colors.primary
+                  }}
+                >
+                  <View style={{ 
+                    flexDirection: "row", 
+                    justifyContent: "space-between", 
+                    alignItems: "center"
+                  }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ 
+                        color: theme.colors.text, 
+                        ...theme.typography.body,
+                        fontWeight: "600"
+                      }}>
+                        {meal.title}
+                      </Text>
+                      <Text style={{ 
+                        color: theme.colors.primary, 
+                        ...theme.typography.caption, 
+                        marginTop: theme.spacing.xs 
+                      }}>
+                        Appuyer pour voir le détail
+                      </Text>
+                    </View>
+                    <View style={{ 
+                      flexDirection: "column", 
+                      alignItems: "center",
+                      gap: theme.spacing.xs
+                    }}>
+                      {/* Bouton cochable */}
+                      <Pressable
+                        onPress={async (e) => {
+                          e.stopPropagation();
+                          await toggleMealEaten(meal.id, meal.content);
+                        }}
+                        style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: 6,
+                          borderWidth: 2,
+                          borderColor: eatenMeals.has(meal.id) ? theme.colors.success : theme.colors.border,
+                          backgroundColor: eatenMeals.has(meal.id) ? theme.colors.success : theme.colors.surfaceElevated,
+                          justifyContent: "center",
+                          alignItems: "center",
+                        }}
+                      >
+                        {eatenMeals.has(meal.id) && (
+                          <Text style={{ 
+                            color: theme.colors.background, 
+                            fontSize: 14, 
+                            fontWeight: "700" 
+                          }}>✓</Text>
+                        )}
+                      </Pressable>
+                      
+                      {/* Bouton de suppression */}
+                      <Pressable
+                        onPress={async (e) => {
+                          e.stopPropagation();
+                          console.log(`Delete meal from list: ${extractedTitle}`);
+                          
+                          // Pour la simulation sur ordinateur, on peut bypasser l'Alert
+                          const isSimulator = __DEV__ && Platform.OS === 'web';
+                          
+                          if (isSimulator) {
+                            // Suppression directe en simulation
+                            console.log(`Simulator mode: deleting meal directly`);
+                            const success = await deletePlan('meal', meal.id);
+                            if (success) {
+                              loadData();
+                            }
+                            return;
+                          }
+                          
+                          Alert.alert(
+                            "Supprimer le repas",
+                            `Êtes-vous sûr de vouloir supprimer "${extractedTitle}" ?`,
+                            [
+                              { text: "Annuler", style: "cancel" },
+                              {
+                                text: "Supprimer",
+                                style: "destructive",
+                                onPress: async () => {
+                                  console.log(`User confirmed deletion of meal: ${extractedTitle}`);
+                                  const success = await deletePlan('meal', meal.id);
+                                  if (success) {
+                                    loadData();
+                                  }
+                                }
+                              }
+                            ]
+                          );
+                        }}
+                        style={{
+                          backgroundColor: theme.colors.surface,
+                          paddingHorizontal: theme.spacing.xs,
+                          paddingVertical: theme.spacing.xs,
+                          borderRadius: theme.borderRadius.sm,
+                          borderWidth: 1,
+                          borderColor: theme.colors.primary,
+                        }}
+                      >
+                        <Text style={{ 
+                          color: theme.colors.primary, 
+                          ...theme.typography.caption,
+                          fontSize: 16,
+                          fontWeight: "600"
+                        }}>✕</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        ) : (
+          <View style={{ 
+            backgroundColor: "#1a1a1a", 
+            padding: 16, 
+            borderRadius: 8,
+            alignItems: "center"
+          }}>
             <Text style={{ 
-              color: theme.colors.primary, 
-              ...theme.typography.button
+              color: theme.colors.textSecondary, 
+              ...theme.typography.caption,
+              fontStyle: "italic" 
             }}>
-              Ajouter un repas
+              Aucun repas sauvegardé
             </Text>
-          </Pressable>
-        </View>
+            <Text style={{ 
+              color: theme.colors.textTertiary, 
+              ...theme.typography.caption,
+              marginTop: 4 
+            }}>
+              Demande un repas dans le chat pour l'enregistrer ici
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Section Sport - Design Apple */}
@@ -2141,22 +2171,18 @@ export default function Dashboard() {
             <ScrollView style={{ maxHeight: 400 }}>
               {selectedMeal?.content ? (
                 <View>
+                  {/* Titre Ingrédients en bleu au début */}
+                  <Text style={{ 
+                    color: theme.colors.primary, 
+                    fontSize: 16, 
+                    fontWeight: '700',
+                    marginBottom: 12
+                  }}>
+                    Ingrédients
+                  </Text>
+                  
                   {selectedMeal.content.split('\n').map((line, index) => {
-                    // Détecter les sections Ingrédients et Préparation
-                    if (line.toLowerCase().includes('ingrédients') && line.includes(':')) {
-                      return (
-                        <View key={index} style={{ marginTop: index > 0 ? 20 : 0, marginBottom: 10 }}>
-                          <Text style={{ 
-                            color: theme.colors.primary, 
-                            fontSize: 16, 
-                            fontWeight: '700',
-                            marginBottom: 8
-                          }}>
-                            {line}
-                          </Text>
-                        </View>
-                      );
-                    }
+                    // Détecter les sections Préparation
                     if (line.toLowerCase().includes('préparation') && line.includes(':')) {
                       return (
                         <View key={index} style={{ marginTop: 20, marginBottom: 10 }}>
